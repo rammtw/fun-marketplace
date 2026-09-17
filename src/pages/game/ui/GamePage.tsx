@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { fetchGame } from 'pages/game/api/fetch-game';
 import { fetchOffers } from 'pages/game/api/fetch-offers';
-import { ApiError } from 'shared/api';
+import { ApiError, fetchGame } from 'shared/api';
 import type { SectionKind } from 'shared/api';
 import { Alert } from 'shared/ui/Alert';
 import { Badge } from 'shared/ui/Badge';

@@ -3,6 +3,7 @@
 Витрина площадки игровых товаров и услуг: список игр, каталог лотов по игре
 с фильтрами по разделу и типу, карточка лота с покупкой, список своих покупок и продаж,
 страница заказа с выданными ключами, кошелёк с пополнением и балансом в шапке,
+рабочий стол продавца — свои лоты со статусами, заведение, правка, остаток и архив,
 регистрация с подтверждением почты и вход по JWT.
 API даёт соседний проект `../symfony-universe`.
 
@@ -51,8 +52,9 @@ npm run api:sync     # копирует openapi.json и прогоняет opena
 src/
   app/        провайдеры, роутер, макет и глобальные стили
   pages/      games (витрина), game (каталог лотов), offer (лот и покупка), orders, order,
-              wallet, login, register, confirm-email, not-found
-  entities/   wallet (баланс), order (словарь статусов)
+              my-offers (лоты продавца), offer-editor, wallet,
+              login, register, confirm-email, not-found
+  entities/   wallet (баланс), order и offer (словари статусов)
   shared/     api, auth (токен и сессия), lib, ui, config
 ```
 

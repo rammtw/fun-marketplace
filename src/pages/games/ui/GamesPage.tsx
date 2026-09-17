@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { fetchGames } from 'pages/games/api/fetch-games';
+import { fetchGames } from 'shared/api';
 import { Alert } from 'shared/ui/Alert';
 import { Spinner } from 'shared/ui/Spinner';
 import { TextField } from 'shared/ui/TextField';

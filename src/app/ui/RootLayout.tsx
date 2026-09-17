@@ -32,6 +32,14 @@ export function RootLayout() {
             {status === 'authenticated' && user ? (
               <>
                 <NavLink
+                  to="/my/offers"
+                  className={({ isActive }) =>
+                    `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+                  }
+                >
+                  Мои лоты
+                </NavLink>
+                <NavLink
                   to="/orders"
                   className={({ isActive }) =>
                     `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`

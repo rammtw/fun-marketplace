@@ -92,6 +92,37 @@ export interface paths {
      * @description Описание, атрибуты, продавец и раздел с игрой.
      */
     get: operations["get_api_offers_show"];
+    /**
+     * Убрать лот
+     * @description Лот уходит в архив: с витрины пропадает и больше не продаётся, но остаётся в истории — на него ссылаются заказы, а выданные ключи лежат в его товарных единицах. Уже оформленные заказы архив не отменяет: услугу продавец всё равно обязан оказать. Повторный вызов ничего не меняет.
+     */
+    delete: operations["delete_api_seller_offers_archive"];
+    /**
+     * Поправить лот
+     * @description Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.
+     */
+    patch: operations["patch_api_seller_offers_update"];
+  };
+  "/api/offers": {
+    /**
+     * Завести лот
+     * @description Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них.
+     */
+    post: operations["post_api_seller_offers_create"];
+  };
+  "/api/offers/mine": {
+    /**
+     * Мои лоты
+     * @description Лоты владельца токена, свежие сверху, во всех статусах — вместе с черновиками и архивом. Чужие лоты сюда не попадают.
+     */
+    get: operations["get_api_seller_offers_mine"];
+  };
+  "/api/offers/{id}/items": {
+    /**
+     * Пополнить остаток
+     * @description Добавляет товарные единицы в лот с автовыдачей. Единицы только добавляются: выданную покупателю удалить нельзя, она уже его.
+     */
+    post: operations["post_api_seller_offers_add_stock"];
   };
   "/api/orders": {
     /**
@@ -130,6 +161,44 @@ export interface components {
     };
     ResendConfirmationRequest: {
       email: string;
+    };
+    /** @enum {string} */
+    DeliveryType: "auto" | "manual";
+    CreateOfferRequest: {
+      sectionId: number;
+      title: string;
+      description: string;
+      /** Цена в копейках: рубли с копейками во float — потерянная копейка. */
+      price: number;
+      deliveryType: components["schemas"]["DeliveryType"];
+      /** @default [] */
+      attributes?: {
+        [key: string]: unknown;
+      };
+      /** @default [] */
+      items?: string[];
+    };
+    /** @enum {string} */
+    OfferStatus: "draft" | "active" | "paused" | "archived";
+    UpdateOfferRequest: {
+      /** @default null */
+      title?: string | null;
+      /** @default null */
+      description?: string | null;
+      /** @default null */
+      price?: number | null;
+      /** @default null */
+      attributes?: {
+        [key: string]: unknown;
+      } | null;
+      /**
+       * Публикация, снятие с витрины и архив — это тоже правка: отдельных ручек под них не нужно.
+       * @default null
+       */
+      status?: components["schemas"]["OfferStatus"] | null;
+    };
+    AddStockRequest: {
+      items: string[];
     };
     PlaceOrderRequest: {
       offerId: string;
@@ -179,8 +248,6 @@ export interface components {
       /** Format: date-time */
       registeredAt: string;
     };
-    /** @enum {string} */
-    DeliveryType: "auto" | "manual";
     OfferSummary: {
       id: string;
       title: string;
@@ -212,6 +279,25 @@ export interface components {
       };
       section: components["schemas"]["SectionContext"];
       seller: components["schemas"]["UserView"];
+    };
+    SellerOfferView: {
+      id: string;
+      status: components["schemas"]["OfferStatus"];
+      title: string;
+      description: string;
+      price: components["schemas"]["Money"];
+      deliveryType: components["schemas"]["DeliveryType"];
+      /** Свободные единицы; null у услуг — их не пересчитать, продавец делает работу сам. */
+      stock?: number | null;
+      isPurchasable: boolean;
+      attributes: {
+        [key: string]: unknown;
+      };
+      section: components["schemas"]["SectionContext"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
     };
     /** @enum {string} */
     OrderStatus: "placed" | "paid" | "delivered" | "completed" | "cancelled" | "disputed" | "refunded";
@@ -569,6 +655,175 @@ export interface operations {
       };
       /** @description Лота с таким идентификатором нет или он не опубликован */
       404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Убрать лот
+   * @description Лот уходит в архив: с витрины пропадает и больше не продаётся, но остаётся в истории — на него ссылаются заказы, а выданные ключи лежат в его товарных единицах. Уже оформленные заказы архив не отменяет: услугу продавец всё равно обязан оказать. Повторный вызов ничего не меняет.
+   */
+  delete_api_seller_offers_archive: {
+    parameters: {
+      path: {
+        /** @description Идентификатор лота */
+        id: string;
+      };
+    };
+    responses: {
+      /** @description Лот в архиве */
+      204: {
+        content: never;
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Лота нет или он чужой */
+      404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Поправить лот
+   * @description Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.
+   */
+  patch_api_seller_offers_update: {
+    parameters: {
+      path: {
+        /** @description Идентификатор лота */
+        id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateOfferRequest"];
+      };
+    };
+    responses: {
+      /** @description Лот после правки */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SellerOfferView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Лота нет или он чужой */
+      404: {
+        content: never;
+      };
+      /** @description Лот в архиве или запрошен возврат в черновики */
+      409: {
+        content: never;
+      };
+      /** @description Запрос не прошёл валидацию или атрибуты не сошлись со схемой раздела */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Завести лот
+   * @description Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них.
+   */
+  post_api_seller_offers_create: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateOfferRequest"];
+      };
+    };
+    responses: {
+      /** @description Лот заведён */
+      201: {
+        content: {
+          "application/json": components["schemas"]["SellerOfferView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Раздела с таким идентификатором нет или игра отключена */
+      404: {
+        content: never;
+      };
+      /** @description Запрос не прошёл валидацию, атрибуты не сошлись со схемой раздела или способ выдачи не подходит разделу */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Мои лоты
+   * @description Лоты владельца токена, свежие сверху, во всех статусах — вместе с черновиками и архивом. Чужие лоты сюда не попадают.
+   */
+  get_api_seller_offers_mine: {
+    parameters: {
+      query?: {
+        /** @description Оставить только лоты в этом статусе */
+        status?: "draft" | "active" | "paused" | "archived" | null;
+      };
+    };
+    responses: {
+      /** @description Лоты продавца */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["SellerOfferView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Статус вне допустимых значений */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Пополнить остаток
+   * @description Добавляет товарные единицы в лот с автовыдачей. Единицы только добавляются: выданную покупателю удалить нельзя, она уже его.
+   */
+  post_api_seller_offers_add_stock: {
+    parameters: {
+      path: {
+        /** @description Идентификатор лота */
+        id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AddStockRequest"];
+      };
+    };
+    responses: {
+      /** @description Лот с новым остатком */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SellerOfferView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Лота нет или он чужой */
+      404: {
+        content: never;
+      };
+      /** @description Лот в архиве */
+      409: {
+        content: never;
+      };
+      /** @description Запрос не прошёл валидацию или у лота нет остатка: это услуга */
+      422: {
         content: never;
       };
     };

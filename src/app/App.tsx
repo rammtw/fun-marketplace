@@ -9,6 +9,8 @@ import { ConfirmEmailPage } from 'pages/confirm-email';
 import { OfferPage } from 'pages/offer';
 import { OrderPage } from 'pages/order';
 import { OrdersPage } from 'pages/orders';
+import { MyOffersPage } from 'pages/my-offers';
+import { OfferEditorPage } from 'pages/offer-editor';
 import { WalletPage } from 'pages/wallet';
 import { NotFoundPage } from 'pages/not-found';
 import { GuestOnly } from './ui/GuestOnly';
@@ -39,6 +41,30 @@ export function App() {
                 element={
                   <RequireAuth>
                     <OrderPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="my/offers"
+                element={
+                  <RequireAuth>
+                    <MyOffersPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="my/offers/new"
+                element={
+                  <RequireAuth>
+                    <OfferEditorPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="my/offers/:id/edit"
+                element={
+                  <RequireAuth>
+                    <OfferEditorPage />
                   </RequireAuth>
                 }
               />

@@ -520,6 +520,271 @@
                         "description": "Лота с таким идентификатором нет или он не опубликован"
                     }
                 }
+            },
+            "delete": {
+                "tags": [
+                    "Мои лоты"
+                ],
+                "summary": "Убрать лот",
+                "description": "Лот уходит в архив: с витрины пропадает и больше не продаётся, но остаётся в истории — на него ссылаются заказы, а выданные ключи лежат в его товарных единицах. Уже оформленные заказы архив не отменяет: услугу продавец всё равно обязан оказать. Повторный вызов ничего не меняет.",
+                "operationId": "delete_api_seller_offers_archive",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор лота",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Лот в архиве"
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Лота нет или он чужой"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Мои лоты"
+                ],
+                "summary": "Поправить лот",
+                "description": "Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.",
+                "operationId": "patch_api_seller_offers_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор лота",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateOfferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Лот после правки",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SellerOfferView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Лота нет или он чужой"
+                    },
+                    "409": {
+                        "description": "Лот в архиве или запрошен возврат в черновики"
+                    },
+                    "422": {
+                        "description": "Запрос не прошёл валидацию или атрибуты не сошлись со схемой раздела"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/offers": {
+            "post": {
+                "tags": [
+                    "Мои лоты"
+                ],
+                "summary": "Завести лот",
+                "description": "Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них.",
+                "operationId": "post_api_seller_offers_create",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateOfferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Лот заведён",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SellerOfferView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Раздела с таким идентификатором нет или игра отключена"
+                    },
+                    "422": {
+                        "description": "Запрос не прошёл валидацию, атрибуты не сошлись со схемой раздела или способ выдачи не подходит разделу"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/offers/mine": {
+            "get": {
+                "tags": [
+                    "Мои лоты"
+                ],
+                "summary": "Мои лоты",
+                "description": "Лоты владельца токена, свежие сверху, во всех статусах — вместе с черновиками и архивом. Чужие лоты сюда не попадают.",
+                "operationId": "get_api_seller_offers_mine",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Оставить только лоты в этом статусе",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "enum": [
+                                "draft",
+                                "active",
+                                "paused",
+                                "archived"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Лоты продавца",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SellerOfferView"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "422": {
+                        "description": "Статус вне допустимых значений"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/offers/{id}/items": {
+            "post": {
+                "tags": [
+                    "Мои лоты"
+                ],
+                "summary": "Пополнить остаток",
+                "description": "Добавляет товарные единицы в лот с автовыдачей. Единицы только добавляются: выданную покупателю удалить нельзя, она уже его.",
+                "operationId": "post_api_seller_offers_add_stock",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор лота",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddStockRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Лот с новым остатком",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SellerOfferView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Лота нет или он чужой"
+                    },
+                    "409": {
+                        "description": "Лот в архиве"
+                    },
+                    "422": {
+                        "description": "Запрос не прошёл валидацию или у лота нет остатка: это услуга"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/orders": {
@@ -787,6 +1052,125 @@
                 },
                 "type": "object"
             },
+            "DeliveryType": {
+                "type": "string",
+                "enum": [
+                    "auto",
+                    "manual"
+                ]
+            },
+            "CreateOfferRequest": {
+                "required": [
+                    "sectionId",
+                    "title",
+                    "description",
+                    "price",
+                    "deliveryType"
+                ],
+                "properties": {
+                    "sectionId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "title": "Цена в копейках: рубли с копейками во float — потерянная копейка.",
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "deliveryType": {
+                        "$ref": "#/components/schemas/DeliveryType"
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "default": [],
+                        "additionalProperties": {
+                            "nullable": true
+                        }
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    }
+                },
+                "type": "object"
+            },
+            "OfferStatus": {
+                "type": "string",
+                "enum": [
+                    "draft",
+                    "active",
+                    "paused",
+                    "archived"
+                ]
+            },
+            "UpdateOfferRequest": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "maxLength": 160
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "price": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "nullable": true,
+                        "default": null,
+                        "additionalProperties": {
+                            "nullable": true
+                        }
+                    },
+                    "status": {
+                        "title": "Публикация, снятие с витрины и архив — это тоже правка: отдельных ручек под них не нужно.",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/OfferStatus"
+                            }
+                        ],
+                        "default": null
+                    }
+                },
+                "type": "object"
+            },
+            "AddStockRequest": {
+                "required": [
+                    "items"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "type": "object"
+            },
             "PlaceOrderRequest": {
                 "required": [
                     "offerId"
@@ -967,13 +1351,6 @@
                 },
                 "type": "object"
             },
-            "DeliveryType": {
-                "type": "string",
-                "enum": [
-                    "auto",
-                    "manual"
-                ]
-            },
             "OfferSummary": {
                 "required": [
                     "id",
@@ -1090,6 +1467,67 @@
                     },
                     "seller": {
                         "$ref": "#/components/schemas/UserView"
+                    }
+                },
+                "type": "object"
+            },
+            "SellerOfferView": {
+                "required": [
+                    "id",
+                    "status",
+                    "title",
+                    "description",
+                    "price",
+                    "deliveryType",
+                    "isPurchasable",
+                    "attributes",
+                    "section",
+                    "createdAt",
+                    "updatedAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/OfferStatus"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "deliveryType": {
+                        "$ref": "#/components/schemas/DeliveryType"
+                    },
+                    "stock": {
+                        "title": "Свободные единицы; null у услуг — их не пересчитать, продавец делает работу сам.",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "isPurchasable": {
+                        "type": "boolean"
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "nullable": true
+                        }
+                    },
+                    "section": {
+                        "$ref": "#/components/schemas/SectionContext"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 },
                 "type": "object"
@@ -1272,6 +1710,9 @@
         },
         {
             "name": "Витрина"
+        },
+        {
+            "name": "Мои лоты"
         },
         {
             "name": "Заказы"
