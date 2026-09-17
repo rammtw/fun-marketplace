@@ -1,0 +1,19 @@
+.wrapper {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.code {
+  margin: 0;
+  font-size: 48px;
+  color: var(--color-text-muted);
+}
+
+.text {
+  margin: 8px 0 20px;
+  color: var(--color-text-muted);
+}
+
+.link {
+  color: var(--color-accent);
+}
