@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { placeOrder } from 'pages/offer/api/place-order';
-import { ApiError, fetchWallet } from 'shared/api';
+import { useWallet } from 'entities/wallet';
+import { ApiError } from 'shared/api';
 import type { Money, OfferDetails } from 'shared/api';
 import { useSession } from 'shared/auth';
-import { formatMoney, multiplyMoney, subtractMoney, useAsyncData } from 'shared/lib';
+import { formatMoney, multiplyMoney, subtractMoney } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
 import { Button } from 'shared/ui/Button';
 import { TextField } from 'shared/ui/TextField';
@@ -33,6 +34,7 @@ function purchaseMessage(error: Error, missing: Money | null): string {
 
 export function PurchasePanel({ offer }: { offer: OfferDetails }) {
   const { status, signOut } = useSession();
+  const { balance, refresh: refreshWallet } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -41,16 +43,10 @@ export function PurchasePanel({ offer }: { offer: OfferDetails }) {
   const [error, setError] = useState<Error | null>(null);
   const [pending, setPending] = useState(false);
 
-  const authenticated = status === 'authenticated';
-  const wallet = useAsyncData(
-    (signal) => (authenticated ? fetchWallet(signal) : Promise.resolve(null)),
-    [authenticated],
-  );
-
   const total = multiplyMoney(offer.price, quantity);
   const shortfall =
-    wallet.data && wallet.data.available.amount < total.amount
-      ? subtractMoney(total, wallet.data.available)
+    balance && balance.available.amount < total.amount
+      ? subtractMoney(total, balance.available)
       : null;
 
   const handleBuy = useCallback(async () => {
@@ -59,6 +55,8 @@ export function PurchasePanel({ offer }: { offer: OfferDetails }) {
 
     try {
       const order = await placeOrder(offer.id, quantity);
+      // Деньги уже списаны — в шапке и на кошельке должно быть новое число.
+      refreshWallet();
       navigate(`/orders/${order.id}`);
     } catch (cause) {
       // Токен протух прямо посреди покупки — возвращаем на вход, а не показываем 401.
@@ -71,7 +69,7 @@ export function PurchasePanel({ offer }: { offer: OfferDetails }) {
     } finally {
       setPending(false);
     }
-  }, [offer.id, quantity, navigate, signOut, location.pathname]);
+  }, [offer.id, quantity, navigate, signOut, refreshWallet, location.pathname]);
 
   return (
     <aside className={styles.panel}>
@@ -115,7 +113,7 @@ export function PurchasePanel({ offer }: { offer: OfferDetails }) {
           <div className={styles.row}>
             <span>На кошельке</span>
             <span className={styles.rowValue}>
-              {wallet.data ? formatMoney(wallet.data.available) : '…'}
+              {balance ? formatMoney(balance.available) : '…'}
             </span>
           </div>
 

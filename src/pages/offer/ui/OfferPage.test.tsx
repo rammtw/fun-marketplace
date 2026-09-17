@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { WalletProvider } from 'entities/wallet';
 import { installFetchMock, mockApi, requestBody } from 'shared/api/test-fetch';
 import { SessionProvider } from 'shared/auth';
 import { OfferPage } from './OfferPage';
@@ -48,10 +49,12 @@ function renderPage() {
   return render(
     <MemoryRouter initialEntries={[`/offers/${OFFER_ID}`]}>
       <SessionProvider>
-        <Routes>
-          <Route path="/offers/:id" element={<OfferPage />} />
-          <Route path="/orders/:id" element={<h1>Заказ оформлен</h1>} />
-        </Routes>
+        <WalletProvider>
+          <Routes>
+            <Route path="/offers/:id" element={<OfferPage />} />
+            <Route path="/orders/:id" element={<h1>Заказ оформлен</h1>} />
+          </Routes>
+        </WalletProvider>
       </SessionProvider>
     </MemoryRouter>,
   );

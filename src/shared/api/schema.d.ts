@@ -95,6 +95,11 @@ export interface paths {
   };
   "/api/orders": {
     /**
+     * Мои заказы
+     * @description Покупки владельца токена, свежие сверху. Продажи — та же ручка с role=seller. Чужие заказы сюда не попадают ни при каких параметрах.
+     */
+    get: operations["get_api_orders_list"];
+    /**
      * Купить лот
      * @description Создаёт заказ по снимку лота и удерживает деньги покупателя в эскроу. Товар выдаётся сразу, услуга ждёт продавца.
      */
@@ -210,6 +215,18 @@ export interface components {
     };
     /** @enum {string} */
     OrderStatus: "placed" | "paid" | "delivered" | "completed" | "cancelled" | "disputed" | "refunded";
+    OrderSummary: {
+      id: string;
+      status: components["schemas"]["OrderStatus"];
+      offerId: string;
+      title: string;
+      price: components["schemas"]["Money"];
+      quantity: number;
+      amount: components["schemas"]["Money"];
+      counterparty: components["schemas"]["UserView"];
+      /** Format: date-time */
+      placedAt: string;
+    };
     OfferSnapshot: {
       title: string;
       price: components["schemas"]["Money"];
@@ -552,6 +569,51 @@ export interface operations {
       };
       /** @description Лота с таким идентификатором нет или он не опубликован */
       404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Мои заказы
+   * @description Покупки владельца токена, свежие сверху. Продажи — та же ручка с role=seller. Чужие заказы сюда не попадают ни при каких параметрах.
+   */
+  get_api_orders_list: {
+    parameters: {
+      query?: {
+        /** @description С какой стороны смотрим: свои покупки или свои продажи */
+        role?: "buyer" | "seller";
+        /** @description Оставить только заказы в этом статусе */
+        status?: "placed" | "paid" | "delivered" | "completed" | "cancelled" | "disputed" | "refunded" | null;
+        /** @description Номер страницы, с единицы */
+        page?: number;
+        /** @description Размер страницы */
+        perPage?: number;
+      };
+    };
+    responses: {
+      /** @description Страница заказов */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["OrderSummary"][];
+            /** @example 1 */
+            page?: number;
+            /** @example 20 */
+            perPage?: number;
+            /**
+             * @description Сколько заказов всего при этих фильтрах
+             * @example 3
+             */
+            total?: number;
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Роль, статус или номер страницы вне допустимых значений */
+      422: {
         content: never;
       };
     };

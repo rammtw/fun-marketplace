@@ -523,6 +523,117 @@
             }
         },
         "/api/orders": {
+            "get": {
+                "tags": [
+                    "Заказы"
+                ],
+                "summary": "Мои заказы",
+                "description": "Покупки владельца токена, свежие сверху. Продажи — та же ручка с role=seller. Чужие заказы сюда не попадают ни при каких параметрах.",
+                "operationId": "get_api_orders_list",
+                "parameters": [
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "description": "С какой стороны смотрим: свои покупки или свои продажи",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "buyer",
+                            "enum": [
+                                "buyer",
+                                "seller"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Оставить только заказы в этом статусе",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "enum": [
+                                "placed",
+                                "paid",
+                                "delivered",
+                                "completed",
+                                "cancelled",
+                                "disputed",
+                                "refunded"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Номер страницы, с единицы",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "perPage",
+                        "in": "query",
+                        "description": "Размер страницы",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 20,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Страница заказов",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/OrderSummary"
+                                            }
+                                        },
+                                        "page": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "perPage": {
+                                            "type": "integer",
+                                            "example": 20
+                                        },
+                                        "total": {
+                                            "description": "Сколько заказов всего при этих фильтрах",
+                                            "type": "integer",
+                                            "example": 3
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "422": {
+                        "description": "Роль, статус или номер страницы вне допустимых значений"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "post": {
                 "tags": [
                     "Заказы"
@@ -994,6 +1105,50 @@
                     "disputed",
                     "refunded"
                 ]
+            },
+            "OrderSummary": {
+                "required": [
+                    "id",
+                    "status",
+                    "offerId",
+                    "title",
+                    "price",
+                    "quantity",
+                    "amount",
+                    "counterparty",
+                    "placedAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "offerId": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "counterparty": {
+                        "$ref": "#/components/schemas/UserView"
+                    },
+                    "placedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
             },
             "OfferSnapshot": {
                 "required": [

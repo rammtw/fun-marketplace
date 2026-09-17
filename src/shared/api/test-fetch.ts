@@ -35,6 +35,15 @@ export function mockApi(routes: Record<string, Reply>): void {
   });
 }
 
+/** Последний URL запроса к ручке — чтобы проверить query-параметры. */
+export function requestUrl(method: string, path: string): string | undefined {
+  const calls = (global.fetch as jest.Mock).mock.calls.filter(
+    ([input, init]) => String(input).split('?')[0] === path && (init?.method ?? 'GET') === method,
+  );
+
+  return calls.length > 0 ? String(calls[calls.length - 1][0]) : undefined;
+}
+
 /** Тело запроса к ручке — чтобы проверить, что ушло на бэкенд. */
 export function requestBody(method: string, path: string): unknown {
   const call = (global.fetch as jest.Mock).mock.calls.find(

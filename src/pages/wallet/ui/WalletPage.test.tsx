@@ -1,8 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
+import { WalletProvider } from 'entities/wallet';
 import { installFetchMock, mockApi, requestBody } from 'shared/api/test-fetch';
+import { SessionProvider } from 'shared/auth';
 import { WalletPage } from './WalletPage';
+
+const buyer = {
+  id: 'u-1',
+  displayName: 'Покупатель',
+  status: 'active',
+  registeredAt: '2026-01-01T00:00:00+00:00',
+};
 
 const empty = {
   userId: 'u-1',
@@ -18,13 +27,18 @@ beforeEach(() => {
 function renderPage(path = '/wallet') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <WalletPage />
+      <SessionProvider>
+        <WalletProvider>
+          <WalletPage />
+        </WalletProvider>
+      </SessionProvider>
     </MemoryRouter>,
   );
 }
 
 test('пополняет счёт в копейках, а вводят рубли', async () => {
   mockApi({
+    'GET /api/auth/me': [200, buyer],
     'GET /api/wallet': [200, empty],
     'POST /api/wallet/deposit': [
       200,
@@ -41,7 +55,7 @@ test('пополняет счёт в копейках, а вводят рубл�
 });
 
 test('подставляет недостающую сумму со страницы лота', async () => {
-  mockApi({ 'GET /api/wallet': [200, empty] });
+  mockApi({ 'GET /api/auth/me': [200, buyer], 'GET /api/wallet': [200, empty] });
 
   renderPage('/wallet?need=1000000');
 
@@ -49,7 +63,7 @@ test('подставляет недостающую сумму со страни
 });
 
 test('не отправляет запрос, пока сумма не похожа на число', async () => {
-  mockApi({ 'GET /api/wallet': [200, empty] });
+  mockApi({ 'GET /api/auth/me': [200, buyer], 'GET /api/wallet': [200, empty] });
 
   renderPage();
   await userEvent.type(await screen.findByLabelText('Пополнить на, ₽'), 'тысяча');

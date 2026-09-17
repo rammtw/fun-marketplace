@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { installFetchMock, mockFetchOnce } from 'shared/api/test-fetch';
+import { installFetchMock, mockApi, mockFetchOnce } from 'shared/api/test-fetch';
 import { App } from './App';
 
 const games = {
@@ -60,6 +60,31 @@ test('с витрины можно перейти в каталог лотов �
     screen.getByText((text) => text.replace(/[\u00a0\u202f]/g, ' ') === '12 900 ₽'),
   ).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Аккаунты' })).toBeInTheDocument();
+});
+
+test('вошедшему показывают баланс и заказы в шапке', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  mockApi({
+    'GET /api/games': [200, games],
+    'GET /api/auth/me': [
+      200,
+      { id: 'u-1', displayName: 'Покупатель', status: 'active', registeredAt: '2026-01-01T00:00:00+00:00' },
+    ],
+    'GET /api/wallet': [
+      200,
+      {
+        userId: 'u-1',
+        available: { amount: 371000, currency: 'RUB' },
+        held: { amount: 129000, currency: 'RUB' },
+      },
+    ],
+  });
+
+  render(<App />);
+
+  const balance = await screen.findByRole('link', { name: /710/ });
+  expect(balance).toHaveAttribute('href', '/wallet');
+  expect(screen.getByRole('link', { name: 'Заказы' })).toHaveAttribute('href', '/orders');
 });
 
 test('гостю показываются вход и регистрация', async () => {

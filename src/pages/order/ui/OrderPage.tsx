@@ -1,29 +1,13 @@
 import { Link, useParams } from 'react-router';
 import { fetchOrder } from 'pages/order/api/fetch-order';
+import { orderStatus } from 'entities/order';
 import { ApiError } from 'shared/api';
-import type { OrderStatus } from 'shared/api';
 import { useSession } from 'shared/auth';
-import { formatMoney, useAsyncData } from 'shared/lib';
+import { formatDateTime, formatMoney, useAsyncData } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
 import { Badge } from 'shared/ui/Badge';
 import { Spinner } from 'shared/ui/Spinner';
 import styles from './OrderPage.module.css';
-
-const STATUS: Record<OrderStatus, { label: string; tone: 'neutral' | 'accent' | 'success' }> = {
-  placed: { label: 'Создан', tone: 'accent' },
-  paid: { label: 'Оплачен', tone: 'accent' },
-  delivered: { label: 'Выдан', tone: 'success' },
-  completed: { label: 'Завершён', tone: 'success' },
-  cancelled: { label: 'Отменён', tone: 'neutral' },
-  disputed: { label: 'Спор', tone: 'neutral' },
-  refunded: { label: 'Возвращён', tone: 'neutral' },
-};
-
-const dateFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' });
-
-function formatDate(value: string): string {
-  return dateFormat.format(new Date(value));
-}
 
 export function OrderPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -48,7 +32,7 @@ export function OrderPage() {
     return null;
   }
 
-  const status = STATUS[order.status];
+  const status = orderStatus(order.status);
   const isSeller = user?.id === order.sellerId;
   // Товар выдаётся сразу, услуга ждёт продавца — покупателю важно понимать, чего ждать.
   const awaitingSeller = order.deliveredItems.length === 0 && !order.deliveredAt;
@@ -77,19 +61,19 @@ export function OrderPage() {
         ) : null}
 
         <dt className={styles.key}>Создан</dt>
-        <dd className={styles.value}>{formatDate(order.placedAt)}</dd>
+        <dd className={styles.value}>{formatDateTime(order.placedAt)}</dd>
 
         {order.paidAt ? (
           <>
             <dt className={styles.key}>Оплачен</dt>
-            <dd className={styles.value}>{formatDate(order.paidAt)}</dd>
+            <dd className={styles.value}>{formatDateTime(order.paidAt)}</dd>
           </>
         ) : null}
 
         {order.deliveredAt ? (
           <>
             <dt className={styles.key}>Выдан</dt>
-            <dd className={styles.value}>{formatDate(order.deliveredAt)}</dd>
+            <dd className={styles.value}>{formatDateTime(order.deliveredAt)}</dd>
           </>
         ) : null}
       </dl>

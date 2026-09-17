@@ -1,8 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { deposit, fetchWallet } from 'shared/api';
-import type { WalletView } from 'shared/api';
-import { formatMoney, parseAmountToMinor, useAsyncData } from 'shared/lib';
+import { useWallet } from 'entities/wallet';
+import { deposit } from 'shared/api';
+import { formatMoney, parseAmountToMinor } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
 import { Button } from 'shared/ui/Button';
 import { Spinner } from 'shared/ui/Spinner';
@@ -23,16 +23,12 @@ function initialAmount(need: string | null): string {
 
 export function WalletPage() {
   const [searchParams] = useSearchParams();
-  const loaded = useAsyncData(fetchWallet, []);
+  const { balance, loading, error: loadError, apply } = useWallet();
 
-  const [wallet, setWallet] = useState<WalletView | null>(null);
   const [amount, setAmount] = useState(() => initialAmount(searchParams.get('need')));
   const [error, setError] = useState<Error | null>(null);
   const [deposited, setDeposited] = useState(false);
   const [pending, setPending] = useState(false);
-
-  // Пока не пополняли, показываем загруженный баланс; после — ответ пополнения.
-  const current = wallet ?? loaded.data;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,7 +43,8 @@ export function WalletPage() {
 
     setPending(true);
     try {
-      setWallet(await deposit(minor));
+      // Ручка возвращает баланс после зачисления — второй запрос не нужен.
+      apply(await deposit(minor));
       setDeposited(true);
       setAmount('');
     } catch (cause) {
@@ -61,19 +58,19 @@ export function WalletPage() {
     <div className={styles.card}>
       <h1 className={styles.title}>Кошелёк</h1>
 
-      {loaded.loading && !current ? <Spinner label="Загружаем баланс…" /> : null}
-      {loaded.error && !current ? <Alert tone="error">{loaded.error.message}</Alert> : null}
+      {loading && !balance ? <Spinner label="Загружаем баланс…" /> : null}
+      {loadError && !balance ? <Alert tone="error">{loadError.message}</Alert> : null}
 
-      {current ? (
+      {balance ? (
         <>
           <div className={styles.balance}>
             <div className={styles.tile}>
               <span className={styles.tileLabel}>Доступно</span>
-              <span className={styles.tileValue}>{formatMoney(current.available)}</span>
+              <span className={styles.tileValue}>{formatMoney(balance.available)}</span>
             </div>
             <div className={styles.tile}>
               <span className={styles.tileLabel}>Удержано по заказам</span>
-              <span className={styles.tileValue}>{formatMoney(current.held)}</span>
+              <span className={styles.tileValue}>{formatMoney(balance.held)}</span>
             </div>
           </div>
           <p className={styles.hint}>

@@ -1,9 +1,12 @@
 import { Link, NavLink, Outlet } from 'react-router';
+import { useWallet } from 'entities/wallet';
 import { useSession } from 'shared/auth';
+import { formatMoney } from 'shared/lib';
 import styles from './RootLayout.module.css';
 
 export function RootLayout() {
   const { user, status, signOut } = useSession();
+  const { balance } = useWallet();
 
   return (
     <div className={styles.page}>
@@ -29,12 +32,22 @@ export function RootLayout() {
             {status === 'authenticated' && user ? (
               <>
                 <NavLink
-                  to="/wallet"
+                  to="/orders"
                   className={({ isActive }) =>
                     `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
                   }
                 >
-                  Кошелёк
+                  Заказы
+                </NavLink>
+                {/* Баланс — он же вход в кошелёк: две ссылки рядом были бы об одном. */}
+                <NavLink
+                  to="/wallet"
+                  className={({ isActive }) =>
+                    `${styles.balance} ${isActive ? styles.balanceActive : ''}`
+                  }
+                  title="Доступно на кошельке"
+                >
+                  {balance ? formatMoney(balance.available) : 'Кошелёк'}
                 </NavLink>
                 <span className={styles.user}>
                   <span className={styles.userName}>{user.displayName}</span>

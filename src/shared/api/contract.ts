@@ -16,6 +16,7 @@ export type SectionKind = Schemas['SectionKind'];
 export type OfferSummary = Schemas['OfferSummary'];
 export type OfferDetails = Schemas['OfferDetails'];
 export type OrderView = Schemas['OrderView'];
+export type OrderSummary = Schemas['OrderSummary'];
 export type OrderStatus = Schemas['OrderStatus'];
 export type WalletView = Schemas['WalletView'];
 export type DeliveryType = Schemas['DeliveryType'];
