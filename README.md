@@ -1,46 +1,58 @@
-# Getting Started with Create React App
+# Universe Market — фронтенд
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Витрина площадки игровых товаров и услуг: список игр, каталог лотов по игре
+с фильтрами по разделу и типу, карточка лота с покупкой, страница заказа с выданными
+ключами, кошелёк с пополнением, регистрация с подтверждением почты и вход по JWT.
+API даёт соседний проект `../symfony-universe`.
 
-## Available Scripts
+## Запуск
 
-In the project directory, you can run:
+```bash
+npm install
+npm start          # http://localhost:3000
+```
 
-### `npm start`
+Нужен поднятый бэкенд — в `../symfony-universe`:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```bash
+make up            # API на http://localhost:8080, письма в Mailpit на :8025
+make fixtures      # игры, разделы, лоты и аккаунты для витрины
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+Запросы идут относительными путями `/api/...`; в разработке dev-сервер проксирует
+их на `http://localhost:8080` (`proxy` в `package.json`), поэтому CORS не нужен.
+Для сборки под другой хост задайте `REACT_APP_API_URL`.
 
-### `npm test`
+## Проверки
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+npm test             # jest + Testing Library, watch
+npm run typecheck    # tsc --noEmit
+npm run build        # production-сборка (CI=true считает предупреждения ошибками)
+```
 
-### `npm run build`
+## Типы API
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Типы ответов не пишутся руками, а генерируются из спеки бэкенда:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+npm run api:sync     # копирует openapi.json и прогоняет openapi-typescript
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Результат — `src/shared/api/schema.d.ts`; понятные имена для его типов собраны
+в `src/shared/api/contract.ts`.
 
-### `npm run eject`
+## Структура
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+Проект разложен по [Feature-Sliced Design](https://feature-sliced.design) v2.1:
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```text
+src/
+  app/        провайдеры, роутер, макет и глобальные стили
+  pages/      games (витрина), game (каталог лотов), offer (лот и покупка), order, wallet,
+              login, register, confirm-email, not-found
+  shared/     api, auth (токен и сессия), lib, ui, config
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+Слои `entities/` и `features/` не заведены: пока нет переиспользования, которое их
+оправдывает. Подробности и договорённости по проекту — в `CLAUDE.md`.

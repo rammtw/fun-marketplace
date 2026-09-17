@@ -1,0 +1,127 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Что это
+
+Фронтенд площадки игровых товаров и услуг: витрина игр, каталог лотов по игре,
+карточка лота с покупкой, заказ, кошелёк, регистрация и вход. Бэкенд лежит рядом — `../symfony-universe` (JSON API + JWT,
+без своего фронта); его `CLAUDE.md`, `AGENTS.md` и `docs/architecture.md` описывают
+домен и решения, перед доменной работой читать их, а не догадываться по именам полей.
+
+## Команды
+
+```bash
+npm start                    # dev-сервер на :3000
+npm run build
+npm test                     # watch-режим CRA
+npm run typecheck            # tsc --noEmit
+CI=true npx react-scripts test src/app/App.test.tsx -t "гостю показываются вход и регистрация"
+```
+
+Отдельной команды линта нет: конфиг `react-app` зашит в `package.json` и работает
+только внутри `react-scripts` — ошибки видно в консоли dev-сервера и в `build`.
+`CI=true npm run build` считает предупреждения ошибками, этим и проверяется линт.
+
+## Типы API генерируются, а не пишутся
+
+```bash
+npm run api:sync             # = api:schema + api:types
+```
+
+`api:schema` копирует `../symfony-universe/docs/openapi.json` в
+`src/shared/api/openapi.json`, `api:types` прогоняет его через `openapi-typescript`
+в `src/shared/api/schema.d.ts`. `schema.d.ts` — артефакт, руками не править; удобные
+имена для типов из него живут в `src/shared/api/contract.ts`. Контракт поменялся —
+сначала в бэкенде `make openapi`, потом здесь `npm run api:sync`. Сама спека лежит
+в репозитории, так что читать контракт можно и без поднятого бэкенда.
+
+## Бэкенд под рукой
+
+В `../symfony-universe`: `make up` поднимает стек, `make fixtures` заливает игры,
+лоты и аккаунты. API — `http://localhost:8080`, Swagger UI — `/api/doc`, письма —
+Mailpit на `http://localhost:8025`.
+
+Запросы уходят относительными путями (`/api/...`): в разработке их проксирует
+dev-сервер CRA (`"proxy"` в `package.json`), поэтому CORS на бэкенде не нужен —
+бандла nelmio/cors там и нет. Для сборки на другой хост адрес задаётся
+`REACT_APP_API_URL` (CRA пробрасывает в бандл только переменные с этим префиксом),
+читается он в `src/shared/config/api.ts`. Побочный эффект прокси: запрос без
+`Accept: text/html` уходит на бэкенд, так что `curl http://localhost:3000/games/x`
+вернёт 404 от Symfony, а браузер получит index.html.
+
+## Что важно в контракте
+
+- **Аутентификация.** `POST /api/auth/login` → `{ token }`, дальше заголовок
+  `Authorization: Bearer`. Почта подтверждается по ссылке из письма; до подтверждения
+  login отвечает 401 с готовым для показа `message`, повторное письмо —
+  `/api/auth/resend-confirmation`. Ссылка из письма ведёт прямо в API
+  (`GET /api/auth/confirm`), страница `/confirm` на фронте — для случая, когда
+  токен открывают через него.
+- **Текст ошибки** лежит в разных полях: lexik отдаёт `message`, обработчик Symfony —
+  problem+json с `detail` и `violations`. Разбирает это `shared/api/client.ts`,
+  наружу отдавая `ApiError` со статусом и разобранными нарушениями полей.
+- **Деньги** всегда `{ amount, currency }`, где `amount` — целое в минорных единицах
+  (копейках). Форматирование только на фронте (`shared/lib/money.ts`), никакой
+  арифметики во float.
+- **Публичное против приватного.** Витрина (`/api/games`, `/api/games/{slug}/offers`,
+  `/api/offers/{id}`, `/api/users`) открыта; кошелёк и заказы требуют токен.
+- **Покупка** `POST /api/orders` различает исходы кодами: 402 — не хватает денег на
+  кошельке, 403 — свой же лот, 404 — лота нет, 409 — лот снят или единиц меньше
+  запрошенного, 422 — валидация. Эти случаи в UI разные, общей «ошибки» мало, разбирает
+  их `pages/offer/ui/PurchasePanel.tsx`. Текст 402 с бэкенда показывать нельзя — там
+  суммы в копейках («На счету 12300, требуется 45600»), нехватку считаем сами по балансу
+  и ведём на `/wallet?need=<копейки>`.
+- **Пополнение** `POST /api/wallet/deposit` — заглушка вместо платёжного провайдера,
+  деньги зачисляются сразу. Сумма в копейках: рубли из формы переводит
+  `parseAmountToMinor`.
+- **Заказ** идёт по статусам `placed → paid → delivered → completed` (плюс `cancelled`,
+  `disputed`, `refunded`). Товар (`kind: goods`) выдаётся сразу, услуга (`service`)
+  ждёт продавца; `deliveryType` — `auto`/`manual`.
+- **Раздел игры** несёт `attributeSchema` — схему атрибутов лота. Формы и фильтры лотов
+  строятся по ней, а не хардкодом под конкретную игру.
+
+## Раскладка кода: FSD
+
+Установлены две skill'ы (`.claude/skills`, `.agents/skills`, версии в
+`skills-lock.json`): `feature-sliced-design` (v2.1) и `vercel-react-best-practices`.
+Перед тем как заводить каталоги, читать skill FSD.
+
+```text
+src/
+  app/        провайдеры, роутер, макет страницы, глобальные стили, RequireAuth/GuestOnly
+  pages/      games, game, offer, order, wallet, login, register, confirm-email, not-found
+  shared/     api (клиент + сгенерированные типы), auth (токен и сессия), lib, ui, config
+```
+
+Закрытые токеном маршруты (`/wallet`, `/orders/:id`) обёрнуты в `RequireAuth`: он
+запоминает путь в `location.state.from`, и страница входа возвращает туда после входа.
+
+Слоёв `entities/` и `features/` нет намеренно: переиспользования, которое их оправдает,
+пока не появилось — запросы страницы лежат в её же `api/`, общий остаётся только
+транспорт. `widgets/` не заводить. Импорты абсолютные от `src` (`baseUrl` в
+`tsconfig.json`), слайс подключается через свой `index.ts`.
+
+Сессия — `shared/auth`: токен в `localStorage`, `SessionProvider` при старте
+дёргает `/api/auth/me` и гасит токен, только если его отверг сервер (401), а не при
+сетевой ошибке. `shared/api/client.ts` берёт токен напрямую из `shared/auth/token.ts`,
+в обход `index.ts` слайса — иначе получается цикл импортов.
+
+## Ограничения окружения
+
+Сборка — `react-scripts` 5.0.1, из-за него же приколочены TypeScript 4.9 и jest 27
+(React при этом 19, react-router 7). Уход на Vite/Next и `eject` — отдельное решение,
+не побочный эффект задачи.
+
+Два следствия старого jest, которые ломают тесты, если про них забыть:
+
+- роутер импортируется из `react-router`, а не из `react-router-dom`: jest 27 не умеет
+  `exports`-подпути и спотыкается на `react-router/dom`;
+- `src/setupTests.ts` доливает `TextEncoder`/`TextDecoder` — в jsdom из jest 27 их нет,
+  а react-router читает их при загрузке модуля.
+
+Запросы в тестах глушатся через `shared/api/test-fetch.ts`: клиенту хватает `ok`,
+`status` и `text()`. `mockFetchOnce` отвечает на следующий запрос по порядку,
+`mockApi` — по ключу «METHOD /path»; когда на странице несколько запросов
+(лот + кошелёк + сессия), брать `mockApi`: порядок эффектов — не контракт.
+`requestBody('POST', '/api/orders')` достаёт отправленное тело.

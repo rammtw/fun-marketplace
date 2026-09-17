@@ -1,0 +1,1125 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Symfony Universe API",
+        "description": "Площадка игровых товаров и услуг.\nСхемы ответов выведены из readonly-DTO слоя Application, а не описаны руками.\n",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080"
+        }
+    ],
+    "paths": {
+        "/api/wallet": {
+            "get": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Баланс",
+                "description": "available — свободные деньги, held — удержанные по заказам.",
+                "operationId": "get_api_wallet_balance",
+                "responses": {
+                    "200": {
+                        "description": "Баланс владельца токена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WalletView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/wallet/deposit": {
+            "post": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Пополнить счёт",
+                "description": "Заглушка вместо платёжного провайдера: деньги зачисляются без оплаты. Нужна, чтобы покупку можно было довести до конца.",
+                "operationId": "post_api_wallet_deposit",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DepositRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Баланс после пополнения",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WalletView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "422": {
+                        "description": "Сумма не прошла валидацию"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/games": {
+            "get": {
+                "tags": [
+                    "Каталог"
+                ],
+                "summary": "Список активных игр",
+                "description": "Без разделов: витрине они не нужны.",
+                "operationId": "get_api_games_list",
+                "responses": {
+                    "200": {
+                        "description": "Игры, отсортированные по названию",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/GameSummary"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/games/{slug}": {
+            "get": {
+                "tags": [
+                    "Каталог"
+                ],
+                "summary": "Карточка игры",
+                "description": "То же, что в списке, плюс разделы со схемой атрибутов лота.",
+                "operationId": "get_api_games_show",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "description": "Человекочитаемый идентификатор игры",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9-]+"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Игра с разделами",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GameDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Игры с таким slug нет или она отключена"
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "tags": [
+                    "Служебные"
+                ],
+                "summary": "Проверка живости",
+                "description": "Ручка для healthcheck контейнера и балансировщика: ничего не проверяет, кроме того, что приложение отвечает.",
+                "operationId": "get_health",
+                "responses": {
+                    "200": {
+                        "description": "Приложение отвечает",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "ok"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/register": {
+            "post": {
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Зарегистрировать аккаунт",
+                "description": "Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя.",
+                "operationId": "post_api_auth_register",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegistrationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Аккаунт создан, письмо отправлено",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserView"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Почта уже занята"
+                    },
+                    "422": {
+                        "description": "Данные не прошли валидацию"
+                    }
+                }
+            }
+        },
+        "/api/auth/confirm": {
+            "get": {
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Подтвердить почту",
+                "description": "Ссылка из письма. Срабатывает один раз: вместе с подтверждением токен гасится.",
+                "operationId": "get_api_auth_confirm",
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "query",
+                        "description": "Токен из письма",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Почта подтверждена, аккаунт активен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserView"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Токен неизвестен, просрочен или уже использован"
+                    }
+                }
+            }
+        },
+        "/api/auth/resend-confirmation": {
+            "post": {
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Выслать письмо подтверждения заново",
+                "description": "Всегда отвечает 202, независимо от того, есть ли такой аккаунт и подтверждён ли он. Прошлый токен перестаёт работать.",
+                "operationId": "post_api_auth_resend_confirmation",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResendConfirmationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Запрос принят"
+                    },
+                    "422": {
+                        "description": "Адрес не похож на почту"
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Войти и получить JWT",
+                "description": "Маршрут нужен, чтобы check_path было на что указывать, а спеке — что описывать.",
+                "operationId": "post_api_auth_login",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "seller@universe.test"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Токен выдан",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Неверная пара почта/пароль, либо почта не подтверждена, либо аккаунт заблокирован",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "code": {
+                                            "type": "integer",
+                                            "example": 401
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Подтвердите почту по ссылке из письма."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Текущий пользователь",
+                "operationId": "get_api_auth_me",
+                "responses": {
+                    "200": {
+                        "description": "Профиль владельца токена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/users": {
+            "get": {
+                "tags": [
+                    "Пользователи"
+                ],
+                "summary": "Публичные профили",
+                "description": "Почта и хеш пароля наружу не отдаются никогда.",
+                "operationId": "get_api_users_list",
+                "responses": {
+                    "200": {
+                        "description": "Профили в порядке регистрации",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserView"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/games/{slug}/offers": {
+            "get": {
+                "tags": [
+                    "Витрина"
+                ],
+                "summary": "Лоты игры",
+                "description": "Товары и услуги активных лотов игры, свежие сверху.",
+                "operationId": "get_api_offers_by_game",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "description": "Человекочитаемый идентификатор игры",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9-]+"
+                        }
+                    },
+                    {
+                        "name": "section",
+                        "in": "query",
+                        "description": "Оставить только лоты этого раздела",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "nullable": true,
+                            "default": null
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "description": "Оставить только товары или только услуги",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "nullable": true,
+                            "default": null,
+                            "enum": [
+                                "goods",
+                                "service"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Лоты игры",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/OfferSummary"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Игры с таким slug нет или она отключена"
+                    }
+                }
+            }
+        },
+        "/api/offers/{id}": {
+            "get": {
+                "tags": [
+                    "Витрина"
+                ],
+                "summary": "Карточка лота",
+                "description": "Описание, атрибуты, продавец и раздел с игрой.",
+                "operationId": "get_api_offers_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор лота",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Лот",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OfferDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Лота с таким идентификатором нет или он не опубликован"
+                    }
+                }
+            }
+        },
+        "/api/orders": {
+            "post": {
+                "tags": [
+                    "Заказы"
+                ],
+                "summary": "Купить лот",
+                "description": "Создаёт заказ по снимку лота и удерживает деньги покупателя в эскроу. Товар выдаётся сразу, услуга ждёт продавца.",
+                "operationId": "post_api_orders_place",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PlaceOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Заказ создан и оплачен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "402": {
+                        "description": "На кошельке не хватает денег"
+                    },
+                    "403": {
+                        "description": "Это собственный лот покупателя"
+                    },
+                    "404": {
+                        "description": "Лота с таким идентификатором нет"
+                    },
+                    "409": {
+                        "description": "Лот снят с продажи или единиц меньше, чем запрошено"
+                    },
+                    "422": {
+                        "description": "Запрос не прошёл валидацию"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{id}": {
+            "get": {
+                "tags": [
+                    "Заказы"
+                ],
+                "summary": "Заказ",
+                "description": "Виден только покупателю и продавцу. Выданные ключи лежат в deliveredItems.",
+                "operationId": "get_api_orders_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор заказа",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Заказ",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Заказа нет или он чужой"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "DepositRequest": {
+                "required": [
+                    "amount"
+                ],
+                "properties": {
+                    "amount": {
+                        "title": "Сумма в копейках: рубли с копейками во float — потерянная копейка.",
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    }
+                },
+                "type": "object"
+            },
+            "RegistrationRequest": {
+                "required": [
+                    "email",
+                    "password",
+                    "displayName"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "maxLength": 180
+                    },
+                    "password": {
+                        "title": "Верхняя граница — не придирка, а предел bcrypt: всё после 72 байт молча отбрасывается.",
+                        "type": "string",
+                        "maxLength": 72,
+                        "minLength": 8
+                    },
+                    "displayName": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "minLength": 2
+                    }
+                },
+                "type": "object"
+            },
+            "ResendConfirmationRequest": {
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "PlaceOrderRequest": {
+                "required": [
+                    "offerId"
+                ],
+                "properties": {
+                    "offerId": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "default": 1,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    }
+                },
+                "type": "object"
+            },
+            "Money": {
+                "required": [
+                    "amount"
+                ],
+                "properties": {
+                    "amount": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "default": "RUB"
+                    }
+                },
+                "type": "object"
+            },
+            "WalletView": {
+                "required": [
+                    "userId",
+                    "available",
+                    "held"
+                ],
+                "properties": {
+                    "userId": {
+                        "type": "string"
+                    },
+                    "available": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "held": {
+                        "$ref": "#/components/schemas/Money"
+                    }
+                },
+                "type": "object"
+            },
+            "GameSummary": {
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "platforms"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "platforms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "SectionKind": {
+                "type": "string",
+                "enum": [
+                    "goods",
+                    "service"
+                ]
+            },
+            "SectionView": {
+                "required": [
+                    "id",
+                    "title",
+                    "kind",
+                    "commissionBasisPoints",
+                    "attributeSchema"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/SectionKind"
+                    },
+                    "commissionBasisPoints": {
+                        "type": "integer"
+                    },
+                    "attributeSchema": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "nullable": true
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "GameDetails": {
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "platforms",
+                    "sections"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "platforms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SectionView"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "UserStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "active",
+                    "limited",
+                    "banned"
+                ]
+            },
+            "UserView": {
+                "required": [
+                    "id",
+                    "displayName",
+                    "status",
+                    "registeredAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/UserStatus"
+                    },
+                    "registeredAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "DeliveryType": {
+                "type": "string",
+                "enum": [
+                    "auto",
+                    "manual"
+                ]
+            },
+            "OfferSummary": {
+                "required": [
+                    "id",
+                    "title",
+                    "price",
+                    "deliveryType",
+                    "sectionId",
+                    "sectionTitle",
+                    "kind"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "deliveryType": {
+                        "$ref": "#/components/schemas/DeliveryType"
+                    },
+                    "stock": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "sectionId": {
+                        "type": "integer"
+                    },
+                    "sectionTitle": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/SectionKind"
+                    }
+                },
+                "type": "object"
+            },
+            "SectionContext": {
+                "required": [
+                    "id",
+                    "title",
+                    "kind",
+                    "commissionBasisPoints",
+                    "gameSlug",
+                    "gameTitle"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/SectionKind"
+                    },
+                    "commissionBasisPoints": {
+                        "type": "integer"
+                    },
+                    "gameSlug": {
+                        "type": "string"
+                    },
+                    "gameTitle": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "OfferDetails": {
+                "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "price",
+                    "deliveryType",
+                    "isPurchasable",
+                    "attributes",
+                    "section",
+                    "seller"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "deliveryType": {
+                        "$ref": "#/components/schemas/DeliveryType"
+                    },
+                    "stock": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "isPurchasable": {
+                        "type": "boolean"
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "nullable": true
+                        }
+                    },
+                    "section": {
+                        "$ref": "#/components/schemas/SectionContext"
+                    },
+                    "seller": {
+                        "$ref": "#/components/schemas/UserView"
+                    }
+                },
+                "type": "object"
+            },
+            "OrderStatus": {
+                "type": "string",
+                "enum": [
+                    "placed",
+                    "paid",
+                    "delivered",
+                    "completed",
+                    "cancelled",
+                    "disputed",
+                    "refunded"
+                ]
+            },
+            "OfferSnapshot": {
+                "required": [
+                    "title",
+                    "price",
+                    "sectionId"
+                ],
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "sectionId": {
+                        "type": "integer"
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "default": [],
+                        "additionalProperties": {
+                            "nullable": true
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "OrderView": {
+                "required": [
+                    "id",
+                    "status",
+                    "offerId",
+                    "buyerId",
+                    "sellerId",
+                    "offer",
+                    "quantity",
+                    "amount",
+                    "commission",
+                    "payout",
+                    "placedAt",
+                    "deliveredItems"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "offerId": {
+                        "type": "string"
+                    },
+                    "buyerId": {
+                        "type": "string"
+                    },
+                    "sellerId": {
+                        "type": "string"
+                    },
+                    "offer": {
+                        "$ref": "#/components/schemas/OfferSnapshot"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "commission": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "payout": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "placedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "paidAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "deliveredAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "deliveredItems": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Кошелёк"
+        },
+        {
+            "name": "Каталог"
+        },
+        {
+            "name": "Служебные"
+        },
+        {
+            "name": "Аутентификация"
+        },
+        {
+            "name": "Пользователи"
+        },
+        {
+            "name": "Витрина"
+        },
+        {
+            "name": "Заказы"
+        }
+    ]
+}

@@ -1,0 +1,88 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 14px 24px;
+}
+
+.logo {
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.logoMark {
+  color: var(--color-accent);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.navLink {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.navLink:hover,
+.navLinkActive {
+  color: var(--color-accent);
+}
+
+.user {
+  color: var(--color-text-muted);
+}
+
+.userName {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  color: var(--color-accent);
+}
+
+.main {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 28px 24px 56px;
+  flex: 1;
+}
+
+.footer {
+  border-top: 1px solid var(--color-border);
+  padding: 16px 24px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: center;
+}

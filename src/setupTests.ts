@@ -1,5 +1,9 @@
-// jest-dom adds custom jest matchers for asserting on DOM nodes.
-// allows you to do things like:
-// expect(element).toHaveTextContent(/react/i)
-// learn more: https://github.com/testing-library/jest-dom
+// jest-dom добавляет матчеры вида toBeInTheDocument().
 import '@testing-library/jest-dom';
+import { TextDecoder, TextEncoder } from 'util';
+
+// jsdom из jest 27 (его версию задаёт react-scripts) не даёт TextEncoder,
+// а react-router 7 читает его при загрузке модуля.
+if (typeof global.TextEncoder === 'undefined') {
+  Object.assign(global, { TextEncoder, TextDecoder });
+}
