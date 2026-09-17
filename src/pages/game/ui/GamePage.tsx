@@ -1,14 +1,24 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { fetchOffers } from 'pages/game/api/fetch-offers';
-import { ApiError, fetchGame } from 'shared/api';
-import type { SectionKind } from 'shared/api';
+import { isSoldOut } from 'pages/game/lib/stock';
+import { ApiError, fetchGame, fetchMyOffers } from 'shared/api';
+import type { OfferSummary, SectionKind } from 'shared/api';
+import { useSession } from 'shared/auth';
 import { Alert } from 'shared/ui/Alert';
 import { Badge } from 'shared/ui/Badge';
 import { Spinner } from 'shared/ui/Spinner';
 import { useAsyncData } from 'shared/lib';
 import { OfferCard } from './OfferCard';
 import styles from './GamePage.module.css';
+
+/**
+ * Бэкенд отдаёт лоты свежими сверху; распроданные опускаем в конец, не путая
+ * остальной порядок — Array.prototype.sort стабилен.
+ */
+function sortSoldOutLast(items: OfferSummary[]): OfferSummary[] {
+  return [...items].sort((first, second) => Number(isSoldOut(first)) - Number(isSoldOut(second)));
+}
 
 const KINDS: Array<{ value: SectionKind | ''; label: string }> = [
   { value: '', label: 'Все' },
@@ -18,6 +28,7 @@ const KINDS: Array<{ value: SectionKind | ''; label: string }> = [
 
 export function GamePage() {
   const { slug = '' } = useParams<{ slug: string }>();
+  const { status: sessionStatus } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const sectionParam = searchParams.get('section');
@@ -32,6 +43,32 @@ export function GamePage() {
     (signal) => fetchOffers(slug, { section, kind }, signal),
     [slug, section, kind],
   );
+
+  // В витринном лоте продавца нет, поэтому свои узнаём сверкой со своим списком.
+  // Запрос вспомогательный: если он не удался, каталог всё равно должен работать.
+  const authenticated = sessionStatus === 'authenticated';
+  const myOffers = useAsyncData(
+    (signal) =>
+      authenticated
+        ? fetchMyOffers('active', signal).catch((error: unknown) => {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              throw error;
+            }
+            return [];
+          })
+        : Promise.resolve([]),
+    [authenticated],
+  );
+
+  const { mine, others } = useMemo(() => {
+    const all = offers.data ?? [];
+    const ids = new Set((myOffers.data ?? []).map((offer) => offer.id));
+
+    return {
+      mine: sortSoldOutLast(all.filter((offer) => ids.has(offer.id))),
+      others: sortSoldOutLast(all.filter((offer) => !ids.has(offer.id))),
+    };
+  }, [offers.data, myOffers.data]);
 
   const applyFilter = useCallback(
     (key: 'section' | 'kind', value: string) => {
@@ -135,12 +172,26 @@ export function GamePage() {
         <p className={styles.empty}>По этим фильтрам лотов нет.</p>
       ) : null}
 
-      {offers.data && offers.data.length > 0 ? (
-        <div className={styles.offers}>
-          {offers.data.map((offer) => (
-            <OfferCard key={offer.id} offer={offer} />
-          ))}
-        </div>
+      {mine.length > 0 ? (
+        <section className={styles.group}>
+          <h2 className={styles.groupTitle}>Ваши лоты</h2>
+          <div className={styles.offers}>
+            {mine.map((offer) => (
+              <OfferCard key={offer.id} offer={offer} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {others.length > 0 ? (
+        <section className={styles.group}>
+          {mine.length > 0 ? <h2 className={styles.groupTitle}>Остальные лоты</h2> : null}
+          <div className={styles.offers}>
+            {others.map((offer) => (
+              <OfferCard key={offer.id} offer={offer} />
+            ))}
+          </div>
+        </section>
       ) : null}
     </>
   );

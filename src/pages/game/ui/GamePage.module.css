@@ -76,6 +76,16 @@
   color: var(--color-accent);
 }
 
+.group + .group {
+  margin-top: 28px;
+}
+
+.groupTitle {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--color-text-muted);
+}
+
 .offers {
   display: grid;
   gap: 12px;
@@ -97,6 +107,16 @@
 
 .offer:hover {
   border-color: var(--color-accent);
+}
+
+.soldOut {
+  /* Лот остаётся кликабельным: карточка откроется и объяснит, что он не продаётся. */
+  opacity: 0.55;
+}
+
+.soldOut:hover {
+  border-color: var(--color-border);
+  opacity: 0.75;
 }
 
 .offerTitle {

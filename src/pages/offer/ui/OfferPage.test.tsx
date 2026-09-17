@@ -114,3 +114,29 @@ test('при нехватке денег зовёт пополнить коше�
   expect(deposit).toHaveAttribute('href', '/wallet?need=1000000');
   expect(screen.getByRole('status')).toHaveTextContent('Не хватает');
 });
+
+test('на своём лоте панели покупки нет', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  mockApi({
+    // Продавец лота и владелец токена — один человек.
+    'GET /api/auth/me': [200, offer.seller],
+    [`GET /api/offers/${OFFER_ID}`]: [200, offer],
+    'GET /api/wallet': [
+      200,
+      {
+        userId: 'u-2',
+        available: { amount: 2000000, currency: 'RUB' },
+        held: { amount: 0, currency: 'RUB' },
+      },
+    ],
+  });
+
+  renderPage();
+
+  expect(await screen.findByText(/Это ваш лот/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Купить' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Изменить лот' })).toHaveAttribute(
+    'href',
+    `/my/offers/${OFFER_ID}/edit`,
+  );
+});

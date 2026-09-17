@@ -33,7 +33,7 @@ function purchaseMessage(error: Error, missing: Money | null): string {
 }
 
 export function PurchasePanel({ offer }: { offer: OfferDetails }) {
-  const { status, signOut } = useSession();
+  const { user, status, signOut } = useSession();
   const { balance, refresh: refreshWallet } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,7 +75,15 @@ export function PurchasePanel({ offer }: { offer: OfferDetails }) {
     <aside className={styles.panel}>
       <div className={styles.price}>{formatMoney(offer.price)}</div>
 
-      {!offer.isPurchasable ? (
+      {/* Свой лот купить нельзя — бэкенд отвечает 403, и предлагать это незачем. */}
+      {user && offer.seller.id === user.id ? (
+        <>
+          <Alert tone="info">Это ваш лот. Покупателю он виден так же, без этой панели.</Alert>
+          <Link className={styles.link} to={`/my/offers/${offer.id}/edit`}>
+            Изменить лот
+          </Link>
+        </>
+      ) : !offer.isPurchasable ? (
         <Alert tone="info">Лот сейчас не продаётся.</Alert>
       ) : status === 'anonymous' ? (
         <>
