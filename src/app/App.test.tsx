@@ -1,11 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { installFetchMock, mockApi, mockFetchOnce } from 'shared/api/test-fetch';
+import { installFetchMock, mockApi, mockFetchOnce, requestUrl } from 'shared/api/test-fetch';
 import { App } from './App';
 
 const games = {
   items: [{ id: 21, slug: 'dota-2', title: 'Dota 2', platforms: ['pc', 'linux'] }],
 };
+
+const genshin = { id: 22, slug: 'genshin', title: 'Genshin Impact', platforms: ['pc'] };
 
 const game = {
   id: 21,
@@ -62,29 +64,81 @@ test('с витрины можно перейти в каталог лотов �
   expect(screen.getByRole('button', { name: 'Аккаунты' })).toBeInTheDocument();
 });
 
-test('вошедшему показывают баланс и заказы в шапке', async () => {
+const wallet = {
+  userId: 'u-1',
+  available: { amount: 371000, currency: 'RUB' },
+  held: { amount: 129000, currency: 'RUB' },
+};
+
+const me = {
+  id: 'u-1',
+  displayName: 'Покупатель',
+  status: 'active',
+  registeredAt: '2026-01-01T00:00:00+00:00',
+};
+
+test('вошедшему показывают баланс и покупки, а витрина живёт под логотипом', async () => {
   localStorage.setItem('universe.token', 'jwt-token');
   mockApi({
     'GET /api/games': [200, games],
-    'GET /api/auth/me': [
-      200,
-      { id: 'u-1', displayName: 'Покупатель', status: 'active', registeredAt: '2026-01-01T00:00:00+00:00' },
-    ],
-    'GET /api/wallet': [
-      200,
-      {
-        userId: 'u-1',
-        available: { amount: 371000, currency: 'RUB' },
-        held: { amount: 129000, currency: 'RUB' },
-      },
-    ],
+    'GET /api/offers/mine': [200, { items: [] }],
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
   });
 
   render(<App />);
 
   const balance = await screen.findByRole('link', { name: /710/ });
   expect(balance).toHaveAttribute('href', '/wallet');
-  expect(screen.getByRole('link', { name: 'Заказы' })).toHaveAttribute('href', '/orders');
+  expect(screen.getByRole('link', { name: 'Покупки' })).toHaveAttribute('href', '/orders');
+  // На витрину ведёт логотип, отдельного пункта «Игры» в меню нет.
+  expect(screen.queryByRole('link', { name: 'Игры' })).not.toBeInTheDocument();
+});
+
+test('без своих лотов пункта «Продажи» в шапке нет', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  mockApi({
+    'GET /api/games': [200, games],
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/offers/mine': [200, { items: [] }],
+  });
+
+  render(<App />);
+
+  await screen.findByRole('link', { name: 'Покупки' });
+  await waitFor(() => expect(requestUrl('GET', '/api/offers/mine')).toBeDefined());
+  expect(screen.queryByRole('link', { name: 'Продажи' })).not.toBeInTheDocument();
+});
+
+test('продавцу с лотами показывают «Продажи»', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  mockApi({
+    'GET /api/games': [200, games],
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/offers/mine': [200, { items: [{ id: 'of-1', status: 'active' }] }],
+  });
+
+  render(<App />);
+
+  expect(await screen.findByRole('link', { name: 'Продажи' })).toHaveAttribute(
+    'href',
+    '/my/offers',
+  );
+});
+
+test('поиск в шапке фильтрует витрину и остаётся в адресе', async () => {
+  mockApi({ 'GET /api/games': [200, { items: [...games.items, genshin] }] });
+
+  render(<App />);
+
+  await screen.findByRole('link', { name: /Dota 2/ });
+  await userEvent.type(screen.getByLabelText('Поиск игр'), 'gen');
+
+  expect(await screen.findByRole('link', { name: /Genshin/ })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Dota 2/ })).not.toBeInTheDocument();
+  expect(window.location.search).toBe('?q=gen');
 });
 
 test('гостю показываются вход и регистрация', async () => {
