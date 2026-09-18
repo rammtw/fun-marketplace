@@ -43,7 +43,7 @@ export interface paths {
   "/api/auth/register": {
     /**
      * Зарегистрировать аккаунт
-     * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя.
+     * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку и подтверждение совершеннолетия обязательны, публичный профиль и рассылки — по желанию.
      */
     post: operations["post_api_auth_register"];
   };
@@ -75,7 +75,7 @@ export interface paths {
   "/api/users": {
     /**
      * Публичные профили
-     * @description Почта и хеш пароля наружу не отдаются никогда.
+     * @description Только те, кто согласился показывать профиль в открытой части площадки: публичный список — это распространение персональных данных (ст. 10.1 152-ФЗ). Почта и хеш пароля наружу не отдаются никогда.
      */
     get: operations["get_api_users_list"];
   };
@@ -150,6 +150,58 @@ export interface paths {
      */
     post: operations["post_api_orders_deliver"];
   };
+  "/api/privacy/policy": {
+    /**
+     * Политика обработки персональных данных
+     * @description Действующая редакция целиком. Ручка открыта всем: политику оператор обязан опубликовать в неограниченном доступе (ч. 2 ст. 18.1 152-ФЗ). Номер редакции отсюда клиент присылает обратно при регистрации.
+     */
+    get: operations["get_api_privacy_policy"];
+  };
+  "/api/privacy/consents": {
+    /**
+     * Мои согласия
+     * @description История: и действующие согласия, и отозванные. Отозванное не исчезает — им оператор подтверждает, что обработка была правомерной.
+     */
+    get: operations["get_api_privacy_consents"];
+    /**
+     * Дать согласие
+     * @description Для целей, от которых можно отказаться: публичный профиль и рассылки. Повторное согласие на ту же цель ничего не меняет.
+     */
+    post: operations["post_api_privacy_grant_consent"];
+  };
+  "/api/privacy/consents/{purpose}": {
+    /**
+     * Отозвать согласие
+     * @description Отзыв — безусловное право (ч. 2 ст. 9 152-ФЗ) и исполняется сразу. Обязательное согласие на обработку так отозвать нельзя: без него аккаунта не существует, и это уже требование об уничтожении данных.
+     */
+    delete: operations["delete_api_privacy_revoke_consent"];
+  };
+  "/api/privacy/me": {
+    /**
+     * Сведения об обработке моих данных
+     * @description Ответ на запрос по ст. 14 152-ФЗ: оператор, цели и основания, состав данных, сроки хранения, получатели, история согласий. Закон даёт на такой ответ десять рабочих дней — площадка отвечает сразу.
+     */
+    get: operations["get_api_privacy_me"];
+  };
+  "/api/privacy/requests": {
+    /**
+     * Мои обращения по персональным данным
+     * @description Журнал обращений в части, касающейся заявителя, со сроком ответа по каждому.
+     */
+    get: operations["get_api_privacy_requests"];
+    /**
+     * Подать обращение
+     * @description Запрос сведений, уточнение данных, отзыв согласия. Обращение попадает в журнал с посчитанным сроком ответа.
+     */
+    post: operations["post_api_privacy_file_request"];
+  };
+  "/api/privacy/erasure": {
+    /**
+     * Потребовать уничтожения моих данных
+     * @description Исполняется сразу: данные аккаунта обезличиваются, согласия отзываются, выдаётся акт об уничтожении. Войти в аккаунт после этого нельзя. Заказы и записи реестра остаются обезличенными — их хранение обязательно по 402-ФЗ.
+     */
+    post: operations["post_api_privacy_erasure"];
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -164,7 +216,37 @@ export interface components {
       email: string;
       /** Верхняя граница — не придирка, а предел bcrypt: всё после 72 байт молча отбрасывается. */
       password: string;
+      /** Псевдоним для витрины: настоящее имя тут не нужно и не спрашивается. */
       displayName: string;
+      /**
+       * Редакция политики, которую клиент показал человеку. Приходит от него
+       * же и сверяется с действующей: согласие под текст, которого человек не
+       * видел, информированным не является (ч. 1 ст. 9 152-ФЗ).
+       */
+      policyVersion: string;
+      /**
+       * Согласие на обработку. Обязательное и невыставленное по умолчанию:
+       * молчание и заранее отмеченная галочка согласием не считаются.
+       */
+      personalDataConsent: boolean;
+      /**
+       * Подтверждение совершеннолетия. Данные детей обрабатываются только с
+       * согласия законного представителя, которого площадке взять неоткуда,
+       * да и сделки за деньги несовершеннолетним тут не место.
+       */
+      isAdult: boolean;
+      /**
+       * Показывать профиль в открытой части площадки. Это распространение
+       * персональных данных, и по ч. 6 ст. 10.1 согласие на него отдельное —
+       * поэтому отдельное поле, а не часть галочки выше.
+       * @default false
+       */
+      publicProfileConsent?: boolean;
+      /**
+       * Рассылки. По умолчанию выключены — иначе это не согласие, а уведомление.
+       * @default false
+       */
+      marketingConsent?: boolean;
     };
     ResendConfirmationRequest: {
       email: string;
@@ -215,6 +297,26 @@ export interface components {
     DeliverOrderRequest: {
       note: string;
     };
+    /** @enum {string} */
+    ConsentPurpose: "processing" | "distribution" | "marketing";
+    GrantConsentRequest: {
+      purpose: components["schemas"]["ConsentPurpose"];
+    };
+    /** @enum {string} */
+    SubjectRequestKind: "access" | "rectification" | "revocation" | "erasure";
+    FileSubjectRequest: {
+      kind: components["schemas"]["SubjectRequestKind"];
+      /**
+       * Суть обращения: для уточнения данных без неё нечего делать.
+       * @default null
+       */
+      comment?: string | null;
+    };
+    ErasureRequest: {
+      confirm: boolean;
+      /** @default null */
+      comment?: string | null;
+    };
     Money: {
       amount: number;
       /** @default RUB */
@@ -250,7 +352,7 @@ export interface components {
       sections: components["schemas"]["SectionView"][];
     };
     /** @enum {string} */
-    UserStatus: "pending" | "active" | "limited" | "banned";
+    UserStatus: "pending" | "active" | "limited" | "banned" | "erased";
     UserView: {
       id: string;
       displayName: string;
@@ -352,6 +454,93 @@ export interface components {
       deliveredItems: string[];
       /** @default null */
       deliveryNote?: string | null;
+    };
+    PolicyView: {
+      version: string;
+      title: string;
+      body: string;
+      /** sha256 текста: клиент может убедиться, что показывает то же, под чем подписался. */
+      checksum: string;
+      /** Format: date-time */
+      publishedAt: string;
+    };
+    ConsentView: {
+      purpose: components["schemas"]["ConsentPurpose"];
+      title: string;
+      legalBasis: string;
+      retention: string;
+      policyVersion: string;
+      /** Format: date-time */
+      grantedAt: string;
+      /** Format: date-time */
+      revokedAt?: string | null;
+      ip?: string | null;
+      userAgent?: string | null;
+    };
+    AccountPersonalData: {
+      id: string;
+      email: string;
+      displayName: string;
+      status: components["schemas"]["UserStatus"];
+      /** Format: date-time */
+      registeredAt: string;
+      /** Format: date-time */
+      lastSeenAt?: string | null;
+      /** Format: date-time */
+      adulthoodConfirmedAt?: string | null;
+    };
+    ProcessingPurposeView: {
+      purpose: components["schemas"]["ConsentPurpose"];
+      title: string;
+      legalBasis: string;
+      retention: string;
+      /** Действует ли согласие на эту цель прямо сейчас. */
+      granted: boolean;
+    };
+    PersonalDataView: {
+      /** Оператор: кому адресовать претензию, если что-то пошло не так. */
+      operator: string;
+      /** Действующая редакция политики. */
+      policyVersion: string;
+      account: components["schemas"]["AccountPersonalData"];
+      purposes: components["schemas"]["ProcessingPurposeView"][];
+      /** Категории обрабатываемых данных, включая те, что появились не в профиле. */
+      categories: string[];
+      /** Кому данные передаются и передаются ли вообще. */
+      recipients: string[];
+      /** История согласий: и действующие, и отозванные. */
+      consents: components["schemas"]["ConsentView"][];
+    };
+    /** @enum {string} */
+    SubjectRequestStatus: "received" | "fulfilled" | "rejected";
+    SubjectRequestView: {
+      id: string;
+      kind: components["schemas"]["SubjectRequestKind"];
+      title: string;
+      status: components["schemas"]["SubjectRequestStatus"];
+      comment?: string | null;
+      /** Format: date-time */
+      submittedAt: string;
+      /**
+       * Крайний срок ответа по 152-ФЗ, посчитанный при приёме обращения.
+       * Format: date-time
+       */
+      dueAt: string;
+      /** Format: date-time */
+      resolvedAt?: string | null;
+      resolution?: string | null;
+    };
+    /** @enum {string} */
+    DestructionReason: "consent_withdrawn" | "retention_expired" | "unlawful_processing";
+    DestructionActView: {
+      number: string;
+      subjectId: string;
+      categories: string[];
+      reason: components["schemas"]["DestructionReason"];
+      reasonTitle: string;
+      method: string;
+      /** Format: date-time */
+      destroyedAt: string;
     };
   };
   responses: never;
@@ -471,7 +660,7 @@ export interface operations {
   };
   /**
    * Зарегистрировать аккаунт
-   * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя.
+   * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку и подтверждение совершеннолетия обязательны, публичный профиль и рассылки — по желанию.
    */
   post_api_auth_register: {
     requestBody: {
@@ -486,11 +675,11 @@ export interface operations {
           "application/json": components["schemas"]["UserView"];
         };
       };
-      /** @description Почта уже занята */
+      /** @description Почта уже занята либо политика переиздана и согласие дано под старую редакцию */
       409: {
         content: never;
       };
-      /** @description Данные не прошли валидацию */
+      /** @description Данные не прошли валидацию: в том числе снятая галочка согласия или возраста */
       422: {
         content: never;
       };
@@ -601,7 +790,7 @@ export interface operations {
   };
   /**
    * Публичные профили
-   * @description Почта и хеш пароля наружу не отдаются никогда.
+   * @description Только те, кто согласился показывать профиль в открытой части площадки: публичный список — это распространение персональных данных (ст. 10.1 152-ФЗ). Почта и хеш пароля наружу не отдаются никогда.
    */
   get_api_users_list: {
     responses: {
@@ -998,6 +1187,192 @@ export interface operations {
         content: never;
       };
       /** @description Запрос не прошёл валидацию */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Политика обработки персональных данных
+   * @description Действующая редакция целиком. Ручка открыта всем: политику оператор обязан опубликовать в неограниченном доступе (ч. 2 ст. 18.1 152-ФЗ). Номер редакции отсюда клиент присылает обратно при регистрации.
+   */
+  get_api_privacy_policy: {
+    responses: {
+      /** @description Действующая редакция */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PolicyView"];
+        };
+      };
+    };
+  };
+  /**
+   * Мои согласия
+   * @description История: и действующие согласия, и отозванные. Отозванное не исчезает — им оператор подтверждает, что обработка была правомерной.
+   */
+  get_api_privacy_consents: {
+    responses: {
+      /** @description Согласия владельца токена, свежие сверху */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["ConsentView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Дать согласие
+   * @description Для целей, от которых можно отказаться: публичный профиль и рассылки. Повторное согласие на ту же цель ничего не меняет.
+   */
+  post_api_privacy_grant_consent: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GrantConsentRequest"];
+      };
+    };
+    responses: {
+      /** @description Согласие записано */
+      201: {
+        content: {
+          "application/json": components["schemas"]["ConsentView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Неизвестная цель обработки */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Отозвать согласие
+   * @description Отзыв — безусловное право (ч. 2 ст. 9 152-ФЗ) и исполняется сразу. Обязательное согласие на обработку так отозвать нельзя: без него аккаунта не существует, и это уже требование об уничтожении данных.
+   */
+  delete_api_privacy_revoke_consent: {
+    parameters: {
+      path: {
+        purpose: string;
+      };
+    };
+    responses: {
+      /** @description Согласие отозвано либо его и не было */
+      204: {
+        content: never;
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Такой цели обработки не существует */
+      404: {
+        content: never;
+      };
+      /** @description Отзывается обязательное согласие: нужно требование об уничтожении данных */
+      409: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Сведения об обработке моих данных
+   * @description Ответ на запрос по ст. 14 152-ФЗ: оператор, цели и основания, состав данных, сроки хранения, получатели, история согласий. Закон даёт на такой ответ десять рабочих дней — площадка отвечает сразу.
+   */
+  get_api_privacy_me: {
+    responses: {
+      /** @description Выгрузка по владельцу токена */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PersonalDataView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Мои обращения по персональным данным
+   * @description Журнал обращений в части, касающейся заявителя, со сроком ответа по каждому.
+   */
+  get_api_privacy_requests: {
+    responses: {
+      /** @description Обращения владельца токена, свежие сверху */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["SubjectRequestView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Подать обращение
+   * @description Запрос сведений, уточнение данных, отзыв согласия. Обращение попадает в журнал с посчитанным сроком ответа.
+   */
+  post_api_privacy_file_request: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FileSubjectRequest"];
+      };
+    };
+    responses: {
+      /** @description Обращение принято */
+      201: {
+        content: {
+          "application/json": components["schemas"]["SubjectRequestView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Неизвестный тип обращения или слишком длинный текст */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Потребовать уничтожения моих данных
+   * @description Исполняется сразу: данные аккаунта обезличиваются, согласия отзываются, выдаётся акт об уничтожении. Войти в аккаунт после этого нельзя. Заказы и записи реестра остаются обезличенными — их хранение обязательно по 402-ФЗ.
+   */
+  post_api_privacy_erasure: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ErasureRequest"];
+      };
+    };
+    responses: {
+      /** @description Данные уничтожены, акт выдан */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DestructionActView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Есть незакрытые сделки или деньги на кошельке */
+      409: {
+        content: never;
+      };
+      /** @description Уничтожение не подтверждено */
       422: {
         content: never;
       };

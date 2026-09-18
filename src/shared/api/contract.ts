@@ -25,3 +25,4 @@ export type OrderStatus = Schemas['OrderStatus'];
 export type WalletView = Schemas['WalletView'];
 export type DeliveryType = Schemas['DeliveryType'];
 export type RegistrationRequest = Schemas['RegistrationRequest'];
+export type PolicyView = Schemas['PolicyView'];

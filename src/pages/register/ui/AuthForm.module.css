@@ -44,3 +44,46 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.consents {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.consentsTitle {
+  padding: 0 6px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.policy {
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+}
+
+.policySummary {
+  padding: 10px 12px;
+  color: var(--color-accent);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+/* Текст политики приходит разметкой markdown; показываем как есть,
+   таблицы в нём держатся на выравнивании пробелами. */
+.policyBody {
+  max-height: 320px;
+  padding: 0 12px 12px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
