@@ -80,3 +80,32 @@
 .link {
   color: var(--color-accent);
 }
+
+.deliveryNote {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.deliver {
+  display: grid;
+  gap: 14px;
+}
+
+.deliverActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}

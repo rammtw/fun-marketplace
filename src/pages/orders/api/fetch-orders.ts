@@ -6,6 +6,8 @@ export type OrderRole = 'buyer' | 'seller';
 export interface OrdersQuery {
   role: OrderRole;
   status?: OrderStatus;
+  /** Заказы по одному лоту: вместе с role=seller и status=paid это очередь выдачи. */
+  offerId?: string;
   page: number;
 }
 
@@ -26,6 +28,7 @@ export function fetchOrders(query: OrdersQuery, signal?: AbortSignal): Promise<O
     query: {
       role: query.role,
       status: query.status,
+      offerId: query.offerId,
       page: query.page,
       perPage: ORDERS_PER_PAGE,
     },

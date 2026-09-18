@@ -27,6 +27,16 @@ function readStatus(value: string | null): OrderStatus | undefined {
   return ORDER_STATUSES.find((status) => status === value);
 }
 
+/**
+ * Лот приезжает из ссылки «очередь выдачи» и уходит в query как есть, поэтому
+ * форму сверяем здесь: на мусор бэкенд отвечает 422, а показать это некому.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readOfferId(value: string | null): string | undefined {
+  return value && UUID.test(value) ? value : undefined;
+}
+
 function readPage(value: string | null): number {
   const page = Number(value);
 
@@ -37,11 +47,12 @@ export function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const role = readRole(searchParams.get('role'));
   const status = readStatus(searchParams.get('status'));
+  const offerId = readOfferId(searchParams.get('offerId'));
   const page = readPage(searchParams.get('page'));
 
   const orders = useAsyncData(
-    (signal) => fetchOrders({ role, status, page }, signal),
-    [role, status, page],
+    (signal) => fetchOrders({ role, status, offerId, page }, signal),
+    [role, status, offerId, page],
   );
 
   const update = useCallback(
@@ -68,6 +79,19 @@ export function OrdersPage() {
         <h1 className={styles.title}>{role === 'seller' ? 'Мои продажи' : 'Мои покупки'}</h1>
         {orders.data ? <span className={styles.total}>всего: {total}</span> : null}
       </header>
+
+      {offerId ? (
+        <div className={styles.scope}>
+          <span>Только заказы по одному лоту.</span>
+          <button
+            type="button"
+            className={styles.scopeReset}
+            onClick={() => update({ offerId: '', page: '' })}
+          >
+            Показать все
+          </button>
+        </div>
+      ) : null}
 
       <div className={styles.filters}>
         <div className={styles.filterGroup}>
@@ -117,7 +141,7 @@ export function OrdersPage() {
 
       {orders.data && orders.data.items.length === 0 ? (
         <p className={styles.empty}>
-          {status || role === 'seller' ? (
+          {status || offerId || role === 'seller' ? (
             'По этим фильтрам заказов нет.'
           ) : (
             <>

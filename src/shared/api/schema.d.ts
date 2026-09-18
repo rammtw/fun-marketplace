@@ -143,6 +143,13 @@ export interface paths {
      */
     get: operations["get_api_orders_show"];
   };
+  "/api/orders/{id}/deliver": {
+    /**
+     * Выдать заказ
+     * @description Продавец закрывает ручную выдачу: услуга оказана или товар передан. Что именно передано, уезжает в deliveryNote и видно обеим сторонам. Товар с автовыдачей сюда не приходит — он выдан в момент покупки. Деньги остаются в эскроу.
+     */
+    post: operations["post_api_orders_deliver"];
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -204,6 +211,9 @@ export interface components {
       offerId: string;
       /** @default 1 */
       quantity?: number;
+    };
+    DeliverOrderRequest: {
+      note: string;
     };
     Money: {
       amount: number;
@@ -340,6 +350,8 @@ export interface components {
       /** Format: date-time */
       deliveredAt?: string | null;
       deliveredItems: string[];
+      /** @default null */
+      deliveryNote?: string | null;
     };
   };
   responses: never;
@@ -839,6 +851,8 @@ export interface operations {
         role?: "buyer" | "seller";
         /** @description Оставить только заказы в этом статусе */
         status?: "placed" | "paid" | "delivered" | "completed" | "cancelled" | "disputed" | "refunded" | null;
+        /** @description Оставить только заказы по этому лоту. Вместе с role=seller и status=paid это очередь выдачи одного лота */
+        offerId?: string | null;
         /** @description Номер страницы, с единицы */
         page?: number;
         /** @description Размер страницы */
@@ -867,7 +881,7 @@ export interface operations {
       401: {
         content: never;
       };
-      /** @description Роль, статус или номер страницы вне допустимых значений */
+      /** @description Роль, статус, лот или номер страницы вне допустимых значений */
       422: {
         content: never;
       };
@@ -940,6 +954,51 @@ export interface operations {
       };
       /** @description Заказа нет или он чужой */
       404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Выдать заказ
+   * @description Продавец закрывает ручную выдачу: услуга оказана или товар передан. Что именно передано, уезжает в deliveryNote и видно обеим сторонам. Товар с автовыдачей сюда не приходит — он выдан в момент покупки. Деньги остаются в эскроу.
+   */
+  post_api_orders_deliver: {
+    parameters: {
+      path: {
+        /** @description Идентификатор заказа */
+        id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeliverOrderRequest"];
+      };
+    };
+    responses: {
+      /** @description Заказ выдан */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OrderView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description По этому заказу вы покупатель, а не продавец */
+      403: {
+        content: never;
+      };
+      /** @description Заказа нет или он чужой */
+      404: {
+        content: never;
+      };
+      /** @description Заказ не ждёт выдачи: уже выдан, ещё не оплачен или изменился параллельно */
+      409: {
+        content: never;
+      };
+      /** @description Запрос не прошёл валидацию */
+      422: {
         content: never;
       };
     };

@@ -831,6 +831,19 @@
                         }
                     },
                     {
+                        "name": "offerId",
+                        "in": "query",
+                        "description": "Оставить только заказы по этому лоту. Вместе с role=seller и status=paid это очередь выдачи одного лота",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "nullable": true,
+                            "default": null
+                        }
+                    },
+                    {
                         "name": "page",
                         "in": "query",
                         "description": "Номер страницы, с единицы",
@@ -890,7 +903,7 @@
                         "description": "Токен не передан, истёк или недействителен"
                     },
                     "422": {
-                        "description": "Роль, статус или номер страницы вне допустимых значений"
+                        "description": "Роль, статус, лот или номер страницы вне допустимых значений"
                     }
                 },
                 "security": [
@@ -990,6 +1003,71 @@
                     },
                     "404": {
                         "description": "Заказа нет или он чужой"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{id}/deliver": {
+            "post": {
+                "tags": [
+                    "Заказы"
+                ],
+                "summary": "Выдать заказ",
+                "description": "Продавец закрывает ручную выдачу: услуга оказана или товар передан. Что именно передано, уезжает в deliveryNote и видно обеим сторонам. Товар с автовыдачей сюда не приходит — он выдан в момент покупки. Деньги остаются в эскроу.",
+                "operationId": "post_api_orders_deliver",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор заказа",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeliverOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Заказ выдан",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "403": {
+                        "description": "По этому заказу вы покупатель, а не продавец"
+                    },
+                    "404": {
+                        "description": "Заказа нет или он чужой"
+                    },
+                    "409": {
+                        "description": "Заказ не ждёт выдачи: уже выдан, ещё не оплачен или изменился параллельно"
+                    },
+                    "422": {
+                        "description": "Запрос не прошёл валидацию"
                     }
                 },
                 "security": [
@@ -1184,6 +1262,18 @@
                         "default": 1,
                         "minimum": 0,
                         "exclusiveMinimum": true
+                    }
+                },
+                "type": "object"
+            },
+            "DeliverOrderRequest": {
+                "required": [
+                    "note"
+                ],
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "maxLength": 2000
                     }
                 },
                 "type": "object"
@@ -1679,6 +1769,11 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "deliveryNote": {
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
