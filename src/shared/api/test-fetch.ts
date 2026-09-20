@@ -44,6 +44,13 @@ export function requestUrl(method: string, path: string): string | undefined {
   return calls.length > 0 ? String(calls[calls.length - 1][0]) : undefined;
 }
 
+/** Сколько раз ходили в ручку — например, перечитали ли баланс после операции. */
+export function requestCount(method: string, path: string): number {
+  return (global.fetch as jest.Mock).mock.calls.filter(
+    ([input, init]) => String(input).split('?')[0] === path && (init?.method ?? 'GET') === method,
+  ).length;
+}
+
 /** Тело запроса к ручке — чтобы проверить, что ушло на бэкенд. */
 export function requestBody(method: string, path: string): unknown {
   const call = (global.fetch as jest.Mock).mock.calls.find(

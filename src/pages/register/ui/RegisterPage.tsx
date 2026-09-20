@@ -61,10 +61,6 @@ export function RegisterPage() {
           displayName,
           policyVersion: policy.version,
           personalDataConsent,
-          // Совершеннолетие бэкенд требует отдельным полем (`Assert\IsTrue`), а
-          // спрашиваем мы его одной галочкой с согласием: два вопроса в одной
-          // подписи, поэтому и значение одно.
-          isAdult: personalDataConsent,
           marketingConsent,
         }),
       );
@@ -179,17 +175,14 @@ export function RegisterPage() {
             </p>
 
             <Checkbox
-              label={`Мне есть 18 лет, и я даю согласие на обработку моих персональных данных на условиях политики (редакция ${policy.version})`}
+              label={`Даю согласие на обработку моих персональных данных на условиях политики (редакция ${policy.version})`}
               name="personalDataConsent"
               checked={personalDataConsent}
               onChange={(event) => setPersonalDataConsent(event.target.checked)}
               error={
                 violation('personalDataConsent') ??
-                violation('isAdult') ??
                 violation('policyVersion') ??
-                (missingConsent
-                  ? 'Без подтверждения возраста и согласия аккаунт не завести'
-                  : undefined)
+                (missingConsent ? 'Без согласия аккаунт не завести' : undefined)
               }
             />
             <Checkbox

@@ -17,7 +17,7 @@
                     "Кошелёк"
                 ],
                 "summary": "Баланс",
-                "description": "available — свободные деньги, held — удержанные по заказам.",
+                "description": "available — свободные деньги, held — удержанные по заказам и выплатам в пути.",
                 "operationId": "get_api_wallet_balance",
                 "responses": {
                     "200": {
@@ -41,31 +41,67 @@
                 ]
             }
         },
-        "/api/wallet/deposit": {
+        "/api/wallet/deposits": {
+            "get": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Мои пополнения",
+                "description": "История пополнений владельца токена, свежие сверху.",
+                "operationId": "get_api_wallet_deposits",
+                "responses": {
+                    "200": {
+                        "description": "Пополнения",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DepositView"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "post": {
                 "tags": [
                     "Кошелёк"
                 ],
-                "summary": "Пополнить счёт",
-                "description": "Заглушка вместо платёжного провайдера: деньги зачисляются без оплаты. Нужна, чтобы покупку можно было довести до конца.",
-                "operationId": "post_api_wallet_deposit",
+                "summary": "Пополнить кошелёк",
+                "description": "Заводит платёж в ЮKassa и возвращает confirmationUrl — адрес, на который нужно отправить человека платить. Деньги на балансе появятся только после оплаты: сразу после этого запроса пополнение в статусе pending. returnUrl необязателен и обязан вести на домен площадки; без него ЮKassa вернёт человека на адрес кошелька из настроек.",
+                "operationId": "post_api_wallet_create_deposit",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/DepositRequest"
+                                "$ref": "#/components/schemas/TopUpRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Баланс после пополнения",
+                    "201": {
+                        "description": "Платёж заведён, можно вести человека платить",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/WalletView"
+                                    "$ref": "#/components/schemas/DepositView"
                                 }
                             }
                         }
@@ -74,7 +110,10 @@
                         "description": "Токен не передан, истёк или недействителен"
                     },
                     "422": {
-                        "description": "Сумма не прошла валидацию"
+                        "description": "Сумма меньше рубля или адрес возврата ведёт на чужой домен"
+                    },
+                    "502": {
+                        "description": "ЮKassa не ответила или отказала: платёж не заведён, повторить запрос можно"
                     }
                 },
                 "security": [
@@ -82,6 +121,234 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/wallet/deposits/{id}": {
+            "get": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Статус пополнения",
+                "description": "Ручка, которую клиент опрашивает после возврата с оплаты. Пока пополнение в pending, она спрашивает статус у ЮKassa и, если платёж прошёл, зачисляет деньги — уведомление провайдера для этого не требуется.",
+                "operationId": "get_api_wallet_deposit",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор пополнения",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Пополнение",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DepositView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Пополнения нет или оно чужое"
+                    },
+                    "502": {
+                        "description": "ЮKassa не ответила: статус остался прежним"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/wallet/payouts": {
+            "get": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Мои выплаты",
+                "description": "История выводов владельца токена, свежие сверху.",
+                "operationId": "get_api_wallet_payouts",
+                "responses": {
+                    "200": {
+                        "description": "Выплаты",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PayoutView"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Вывести деньги на карту",
+                "description": "Сумма удерживается на кошельке и уходит в ЮKassa. payoutToken — синоним карты, который клиент получает в виджете выплат ЮKassa; номер карты через площадку не проходит. Деньги списываются окончательно только после подтверждения провайдера, при отказе удержание снимается.",
+                "operationId": "post_api_wallet_create_payout",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PayoutRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Выплата отправлена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PayoutView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "409": {
+                        "description": "На кошельке недостаточно свободных денег"
+                    },
+                    "422": {
+                        "description": "Сумма меньше минимальной или не передан синоним карты"
+                    },
+                    "502": {
+                        "description": "ЮKassa не ответила или отказала: удержание снято, деньги на месте"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/wallet/payouts/{id}": {
+            "get": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Статус выплаты",
+                "description": "Пока выплата в pending, ручка спрашивает статус у ЮKassa: деньги либо списываются окончательно, либо возвращаются в доступные.",
+                "operationId": "get_api_wallet_payout",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор выплаты",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Выплата",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PayoutView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "404": {
+                        "description": "Выплаты нет или она чужая"
+                    },
+                    "502": {
+                        "description": "ЮKassa не ответила: статус остался прежним"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/webhooks/yookassa": {
+            "post": {
+                "tags": [
+                    "Кошелёк"
+                ],
+                "summary": "Уведомление ЮKassa",
+                "description": "Служебная ручка для провайдера, фронтенду не нужна. Принимает тело уведомления (type, event, object) и отвечает 200. Статус операции берётся не отсюда, а запросом в ЮKassa, поэтому подпись уведомления не проверяется.",
+                "operationId": "post_api_webhooks_yookassa",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "example": "notification"
+                                    },
+                                    "event": {
+                                        "type": "string",
+                                        "example": "payment.succeeded"
+                                    },
+                                    "object": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Уведомление принято"
+                    },
+                    "400": {
+                        "description": "Тело запроса не разобрать"
+                    },
+                    "502": {
+                        "description": "ЮKassa не ответила на запрос статуса: уведомление стоит повторить"
+                    }
+                }
             }
         },
         "/api/games": {
@@ -185,7 +452,7 @@
                     "Аутентификация"
                 ],
                 "summary": "Зарегистрировать аккаунт",
-                "description": "Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку и подтверждение совершеннолетия обязательны, публичный профиль и рассылки — по желанию.",
+                "description": "Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку обязательно, публичный профиль и рассылки — по желанию.",
                 "operationId": "post_api_auth_register",
                 "requestBody": {
                     "required": true,
@@ -212,7 +479,7 @@
                         "description": "Почта уже занята либо политика переиздана и согласие дано под старую редакцию"
                     },
                     "422": {
-                        "description": "Данные не прошли валидацию: в том числе снятая галочка согласия или возраста"
+                        "description": "Данные не прошли валидацию: в том числе снятая галочка согласия"
                     }
                 }
             }
@@ -1572,7 +1839,7 @@
     },
     "components": {
         "schemas": {
-            "DepositRequest": {
+            "TopUpRequest": {
                 "required": [
                     "amount"
                 ],
@@ -1580,8 +1847,32 @@
                     "amount": {
                         "title": "Сумма в копейках: рубли с копейками во float — потерянная копейка.",
                         "type": "integer",
-                        "minimum": 0,
-                        "exclusiveMinimum": true
+                        "minimum": 100
+                    },
+                    "returnUrl": {
+                        "title": "Куда ЮKassa вернёт человека после оплаты. Необязателен: если клиент\nничего не прислал, берётся адрес кошелька из настроек. Чужой домен\nсюда не проходит — иначе площадка становится чужим редиректом.",
+                        "type": "string",
+                        "nullable": true,
+                        "default": null,
+                        "maxLength": 1024
+                    }
+                },
+                "type": "object"
+            },
+            "PayoutRequest": {
+                "required": [
+                    "amount",
+                    "payoutToken"
+                ],
+                "properties": {
+                    "amount": {
+                        "title": "Сумма в копейках.",
+                        "type": "integer",
+                        "minimum": 10000
+                    },
+                    "payoutToken": {
+                        "type": "string",
+                        "maxLength": 256
                     }
                 },
                 "type": "object"
@@ -1592,8 +1883,7 @@
                     "password",
                     "displayName",
                     "policyVersion",
-                    "personalDataConsent",
-                    "isAdult"
+                    "personalDataConsent"
                 ],
                 "properties": {
                     "email": {
@@ -1619,10 +1909,6 @@
                     },
                     "personalDataConsent": {
                         "title": "Согласие на обработку. Обязательное и невыставленное по умолчанию:\nмолчание и заранее отмеченная галочка согласием не считаются.",
-                        "type": "boolean"
-                    },
-                    "isAdult": {
-                        "title": "Подтверждение совершеннолетия. Данные детей обрабатываются только с\nсогласия законного представителя, которого площадке взять неоткуда,\nда и сделки за деньги несовершеннолетним тут не место.",
                         "type": "boolean"
                     },
                     "publicProfileConsent": {
@@ -1919,6 +2205,104 @@
                     },
                     "held": {
                         "$ref": "#/components/schemas/Money"
+                    }
+                },
+                "type": "object"
+            },
+            "DepositStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "succeeded",
+                    "canceled"
+                ]
+            },
+            "DepositView": {
+                "required": [
+                    "id",
+                    "amount",
+                    "status",
+                    "createdAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DepositStatus"
+                    },
+                    "confirmationUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paymentId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "cancellationReason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "completedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PayoutStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "succeeded",
+                    "canceled"
+                ]
+            },
+            "PayoutView": {
+                "required": [
+                    "id",
+                    "amount",
+                    "status",
+                    "createdAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/PayoutStatus"
+                    },
+                    "cardLast4": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "payoutId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "cancellationReason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "completedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -2490,11 +2874,6 @@
                         "format": "date-time"
                     },
                     "lastSeenAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true
-                    },
-                    "adulthoodConfirmedAt": {
                         "type": "string",
                         "format": "date-time",
                         "nullable": true

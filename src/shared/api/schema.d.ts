@@ -8,16 +8,54 @@ export interface paths {
   "/api/wallet": {
     /**
      * Баланс
-     * @description available — свободные деньги, held — удержанные по заказам.
+     * @description available — свободные деньги, held — удержанные по заказам и выплатам в пути.
      */
     get: operations["get_api_wallet_balance"];
   };
-  "/api/wallet/deposit": {
+  "/api/wallet/deposits": {
     /**
-     * Пополнить счёт
-     * @description Заглушка вместо платёжного провайдера: деньги зачисляются без оплаты. Нужна, чтобы покупку можно было довести до конца.
+     * Мои пополнения
+     * @description История пополнений владельца токена, свежие сверху.
      */
-    post: operations["post_api_wallet_deposit"];
+    get: operations["get_api_wallet_deposits"];
+    /**
+     * Пополнить кошелёк
+     * @description Заводит платёж в ЮKassa и возвращает confirmationUrl — адрес, на который нужно отправить человека платить. Деньги на балансе появятся только после оплаты: сразу после этого запроса пополнение в статусе pending. returnUrl необязателен и обязан вести на домен площадки; без него ЮKassa вернёт человека на адрес кошелька из настроек.
+     */
+    post: operations["post_api_wallet_create_deposit"];
+  };
+  "/api/wallet/deposits/{id}": {
+    /**
+     * Статус пополнения
+     * @description Ручка, которую клиент опрашивает после возврата с оплаты. Пока пополнение в pending, она спрашивает статус у ЮKassa и, если платёж прошёл, зачисляет деньги — уведомление провайдера для этого не требуется.
+     */
+    get: operations["get_api_wallet_deposit"];
+  };
+  "/api/wallet/payouts": {
+    /**
+     * Мои выплаты
+     * @description История выводов владельца токена, свежие сверху.
+     */
+    get: operations["get_api_wallet_payouts"];
+    /**
+     * Вывести деньги на карту
+     * @description Сумма удерживается на кошельке и уходит в ЮKassa. payoutToken — синоним карты, который клиент получает в виджете выплат ЮKassa; номер карты через площадку не проходит. Деньги списываются окончательно только после подтверждения провайдера, при отказе удержание снимается.
+     */
+    post: operations["post_api_wallet_create_payout"];
+  };
+  "/api/wallet/payouts/{id}": {
+    /**
+     * Статус выплаты
+     * @description Пока выплата в pending, ручка спрашивает статус у ЮKassa: деньги либо списываются окончательно, либо возвращаются в доступные.
+     */
+    get: operations["get_api_wallet_payout"];
+  };
+  "/api/webhooks/yookassa": {
+    /**
+     * Уведомление ЮKassa
+     * @description Служебная ручка для провайдера, фронтенду не нужна. Принимает тело уведомления (type, event, object) и отвечает 200. Статус операции берётся не отсюда, а запросом в ЮKassa, поэтому подпись уведомления не проверяется.
+     */
+    post: operations["post_api_webhooks_yookassa"];
   };
   "/api/games": {
     /**
@@ -43,7 +81,7 @@ export interface paths {
   "/api/auth/register": {
     /**
      * Зарегистрировать аккаунт
-     * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку и подтверждение совершеннолетия обязательны, публичный профиль и рассылки — по желанию.
+     * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку обязательно, публичный профиль и рассылки — по желанию.
      */
     post: operations["post_api_auth_register"];
   };
@@ -239,9 +277,21 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
-    DepositRequest: {
+    TopUpRequest: {
       /** Сумма в копейках: рубли с копейками во float — потерянная копейка. */
       amount: number;
+      /**
+       * Куда ЮKassa вернёт человека после оплаты. Необязателен: если клиент
+       * ничего не прислал, берётся адрес кошелька из настроек. Чужой домен
+       * сюда не проходит — иначе площадка становится чужим редиректом.
+       * @default null
+       */
+      returnUrl?: string | null;
+    };
+    PayoutRequest: {
+      /** Сумма в копейках. */
+      amount: number;
+      payoutToken: string;
     };
     RegistrationRequest: {
       email: string;
@@ -260,12 +310,6 @@ export interface components {
        * молчание и заранее отмеченная галочка согласием не считаются.
        */
       personalDataConsent: boolean;
-      /**
-       * Подтверждение совершеннолетия. Данные детей обрабатываются только с
-       * согласия законного представителя, которого площадке взять неоткуда,
-       * да и сделки за деньги несовершеннолетним тут не место.
-       */
-      isAdult: boolean;
       /**
        * Показывать профиль в открытой части площадки. Это распространение
        * персональных данных, и по ч. 6 ст. 10.1 согласие на него отдельное —
@@ -371,6 +415,34 @@ export interface components {
       userId: string;
       available: components["schemas"]["Money"];
       held: components["schemas"]["Money"];
+    };
+    /** @enum {string} */
+    DepositStatus: "pending" | "succeeded" | "canceled";
+    DepositView: {
+      id: string;
+      amount: components["schemas"]["Money"];
+      status: components["schemas"]["DepositStatus"];
+      confirmationUrl?: string | null;
+      paymentId?: string | null;
+      cancellationReason?: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      completedAt?: string | null;
+    };
+    /** @enum {string} */
+    PayoutStatus: "pending" | "succeeded" | "canceled";
+    PayoutView: {
+      id: string;
+      amount: components["schemas"]["Money"];
+      status: components["schemas"]["PayoutStatus"];
+      cardLast4?: string | null;
+      payoutId?: string | null;
+      cancellationReason?: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      completedAt?: string | null;
     };
     GameSummary: {
       id: number;
@@ -531,8 +603,6 @@ export interface components {
       registeredAt: string;
       /** Format: date-time */
       lastSeenAt?: string | null;
-      /** Format: date-time */
-      adulthoodConfirmedAt?: string | null;
     };
     ProcessingPurposeView: {
       purpose: components["schemas"]["ConsentPurpose"];
@@ -663,7 +733,7 @@ export interface operations {
 
   /**
    * Баланс
-   * @description available — свободные деньги, held — удержанные по заказам.
+   * @description available — свободные деньги, held — удержанные по заказам и выплатам в пути.
    */
   get_api_wallet_balance: {
     responses: {
@@ -680,28 +750,204 @@ export interface operations {
     };
   };
   /**
-   * Пополнить счёт
-   * @description Заглушка вместо платёжного провайдера: деньги зачисляются без оплаты. Нужна, чтобы покупку можно было довести до конца.
+   * Мои пополнения
+   * @description История пополнений владельца токена, свежие сверху.
    */
-  post_api_wallet_deposit: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["DepositRequest"];
-      };
-    };
+  get_api_wallet_deposits: {
     responses: {
-      /** @description Баланс после пополнения */
+      /** @description Пополнения */
       200: {
         content: {
-          "application/json": components["schemas"]["WalletView"];
+          "application/json": {
+            items?: components["schemas"]["DepositView"][];
+          };
         };
       };
       /** @description Токен не передан, истёк или недействителен */
       401: {
         content: never;
       };
-      /** @description Сумма не прошла валидацию */
+    };
+  };
+  /**
+   * Пополнить кошелёк
+   * @description Заводит платёж в ЮKassa и возвращает confirmationUrl — адрес, на который нужно отправить человека платить. Деньги на балансе появятся только после оплаты: сразу после этого запроса пополнение в статусе pending. returnUrl необязателен и обязан вести на домен площадки; без него ЮKassa вернёт человека на адрес кошелька из настроек.
+   */
+  post_api_wallet_create_deposit: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TopUpRequest"];
+      };
+    };
+    responses: {
+      /** @description Платёж заведён, можно вести человека платить */
+      201: {
+        content: {
+          "application/json": components["schemas"]["DepositView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Сумма меньше рубля или адрес возврата ведёт на чужой домен */
       422: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила или отказала: платёж не заведён, повторить запрос можно */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Статус пополнения
+   * @description Ручка, которую клиент опрашивает после возврата с оплаты. Пока пополнение в pending, она спрашивает статус у ЮKassa и, если платёж прошёл, зачисляет деньги — уведомление провайдера для этого не требуется.
+   */
+  get_api_wallet_deposit: {
+    parameters: {
+      path: {
+        /** @description Идентификатор пополнения */
+        id: string;
+      };
+    };
+    responses: {
+      /** @description Пополнение */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DepositView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Пополнения нет или оно чужое */
+      404: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила: статус остался прежним */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Мои выплаты
+   * @description История выводов владельца токена, свежие сверху.
+   */
+  get_api_wallet_payouts: {
+    responses: {
+      /** @description Выплаты */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["PayoutView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Вывести деньги на карту
+   * @description Сумма удерживается на кошельке и уходит в ЮKassa. payoutToken — синоним карты, который клиент получает в виджете выплат ЮKassa; номер карты через площадку не проходит. Деньги списываются окончательно только после подтверждения провайдера, при отказе удержание снимается.
+   */
+  post_api_wallet_create_payout: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PayoutRequest"];
+      };
+    };
+    responses: {
+      /** @description Выплата отправлена */
+      201: {
+        content: {
+          "application/json": components["schemas"]["PayoutView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description На кошельке недостаточно свободных денег */
+      409: {
+        content: never;
+      };
+      /** @description Сумма меньше минимальной или не передан синоним карты */
+      422: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила или отказала: удержание снято, деньги на месте */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Статус выплаты
+   * @description Пока выплата в pending, ручка спрашивает статус у ЮKassa: деньги либо списываются окончательно, либо возвращаются в доступные.
+   */
+  get_api_wallet_payout: {
+    parameters: {
+      path: {
+        /** @description Идентификатор выплаты */
+        id: string;
+      };
+    };
+    responses: {
+      /** @description Выплата */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PayoutView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Выплаты нет или она чужая */
+      404: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила: статус остался прежним */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Уведомление ЮKassa
+   * @description Служебная ручка для провайдера, фронтенду не нужна. Принимает тело уведомления (type, event, object) и отвечает 200. Статус операции берётся не отсюда, а запросом в ЮKassa, поэтому подпись уведомления не проверяется.
+   */
+  post_api_webhooks_yookassa: {
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @example notification */
+          type?: string;
+          /** @example payment.succeeded */
+          event?: string;
+          object?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description Уведомление принято */
+      200: {
+        content: never;
+      };
+      /** @description Тело запроса не разобрать */
+      400: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила на запрос статуса: уведомление стоит повторить */
+      502: {
         content: never;
       };
     };
@@ -765,7 +1011,7 @@ export interface operations {
   };
   /**
    * Зарегистрировать аккаунт
-   * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку и подтверждение совершеннолетия обязательны, публичный профиль и рассылки — по желанию.
+   * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку обязательно, публичный профиль и рассылки — по желанию.
    */
   post_api_auth_register: {
     requestBody: {
@@ -784,7 +1030,7 @@ export interface operations {
       409: {
         content: never;
       };
-      /** @description Данные не прошли валидацию: в том числе снятая галочка согласия или возраста */
+      /** @description Данные не прошли валидацию: в том числе снятая галочка согласия */
       422: {
         content: never;
       };

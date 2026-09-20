@@ -50,7 +50,7 @@ test('отправляет редакцию политики и выбранны
   renderPage();
   await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
-  await userEvent.click(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ }));
   await userEvent.click(screen.getByRole('checkbox', { name: /новинках и акциях/ }));
   await submit();
 
@@ -61,7 +61,6 @@ test('отправляет редакцию политики и выбранны
     password: 'password1',
     policyVersion: '1.0',
     personalDataConsent: true,
-    isAdult: true,
     marketingConsent: true,
   });
 });
@@ -74,9 +73,7 @@ test('без обязательного согласия не ходит на б
   await fillCredentials();
   await submit();
 
-  expect(
-    await screen.findByText('Без подтверждения возраста и согласия аккаунт не завести'),
-  ).toBeInTheDocument();
+  expect(await screen.findByText('Без согласия аккаунт не завести')).toBeInTheDocument();
   expect(requestBody('POST', '/api/auth/register')).toBeUndefined();
 });
 
@@ -89,12 +86,12 @@ test('переизданная политика просит согласить�
   renderPage();
   await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
-  await userEvent.click(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ }));
   await submit();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('теперь действует редакция 1.1');
   expect(screen.getByRole('link', { name: /редакция 1\.1/ })).toBeInTheDocument();
-  expect(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ })).not.toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ })).not.toBeChecked();
 });
 
 test('409 при действующей редакции — это занятая почта', async () => {
@@ -105,7 +102,7 @@ test('409 при действующей редакции — это занята
   renderPage();
   await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
-  await userEvent.click(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ }));
   await submit();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Эта почта уже занята');
