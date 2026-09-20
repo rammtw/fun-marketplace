@@ -6,7 +6,7 @@ import { ApiError, fetchGame, fetchMyOffers } from 'shared/api';
 import type { OfferSummary, SectionKind } from 'shared/api';
 import { useSession } from 'shared/auth';
 import { Alert } from 'shared/ui/Alert';
-import { Badge } from 'shared/ui/Badge';
+import { Button } from 'shared/ui/Button';
 import { Spinner } from 'shared/ui/Spinner';
 import { useAsyncData } from 'shared/lib';
 import { OfferCard } from './OfferCard';
@@ -111,11 +111,13 @@ export function GamePage() {
         <>
           <header className={styles.header}>
             <h1 className={styles.title}>{game.data.title}</h1>
-            <div className={styles.platforms}>
-              {game.data.platforms.map((platform) => (
-                <Badge key={platform}>{platform}</Badge>
-              ))}
-            </div>
+
+            {/* Рабочий стол продавца в шапке появляется только у того, у кого уже есть
+                лоты, а первый лот заводится как раз там — каталог и есть вход для
+                новичка. Гостя по дороге завернёт RequireAuth на вход и вернёт обратно. */}
+            <Link to="/my/offers/new">
+              <Button>Продавать</Button>
+            </Link>
           </header>
 
           <div className={styles.filters}>

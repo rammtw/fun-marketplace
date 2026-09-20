@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { OFFER_STATUSES, offerStatus } from 'entities/offer';
-import { archiveOffer, fetchMyOffers, updateOffer } from 'shared/api';
+import { ApiError, archiveOffer, fetchMyOffers, updateOffer } from 'shared/api';
 import type { OfferStatus, SellerOfferView } from 'shared/api';
 import { useAsyncData } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
@@ -85,7 +85,19 @@ export function MyOffersPage() {
 
       {offers.loading ? <Spinner label="Загружаем лоты…" /> : null}
       {offers.error ? <Alert tone="error">{offers.error.message}</Alert> : null}
-      {actionError ? <Alert tone="error">{actionError.message}</Alert> : null}
+      {actionError ? (
+        <Alert tone="error">
+          {actionError.message}
+          {/* 403 на публикации — это погасший допуск: новая редакция правил
+              принимается и сдаётся заново, снять лот с витрины можно и без неё. */}
+          {actionError instanceof ApiError && actionError.status === 403 ? (
+            <>
+              {' '}
+              <Link to="/selling">Принять правила и сдать тест</Link>
+            </>
+          ) : null}
+        </Alert>
+      ) : null}
 
       {offers.data && offers.data.length === 0 ? (
         <p className={styles.empty}>

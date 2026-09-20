@@ -563,7 +563,7 @@
                     "Мои лоты"
                 ],
                 "summary": "Поправить лот",
-                "description": "Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.",
+                "description": "Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Публикация требует действующего допуска к продаже, снятие и архив — нет. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.",
                 "operationId": "patch_api_seller_offers_update",
                 "parameters": [
                     {
@@ -602,6 +602,9 @@
                     "401": {
                         "description": "Токен не передан, истёк или недействителен"
                     },
+                    "403": {
+                        "description": "Публикация без действующего допуска к продаже"
+                    },
                     "404": {
                         "description": "Лота нет или он чужой"
                     },
@@ -625,7 +628,7 @@
                     "Мои лоты"
                 ],
                 "summary": "Завести лот",
-                "description": "Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них.",
+                "description": "Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них. До первого лота продавец принимает правила продажи и сдаёт экзамен по ним: GET /api/selling/rules, POST /api/selling/admission, POST /api/selling/exam.",
                 "operationId": "post_api_seller_offers_create",
                 "requestBody": {
                     "required": true,
@@ -650,6 +653,9 @@
                     },
                     "401": {
                         "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "403": {
+                        "description": "Правила продажи не приняты или экзамен по действующей редакции не сдан"
                     },
                     "404": {
                         "description": "Раздела с таким идентификатором нет или игра отключена"
@@ -1371,6 +1377,197 @@
                     }
                 ]
             }
+        },
+        "/api/selling/rules": {
+            "get": {
+                "tags": [
+                    "Правила продажи"
+                ],
+                "summary": "Правила продажи и публикации",
+                "description": "Действующая редакция целиком, в Markdown. Ручка открыта всем: правила читают до того, как решают продавать. Номер редакции отсюда клиент присылает обратно вместе с принятием.",
+                "operationId": "get_api_selling_rules",
+                "responses": {
+                    "200": {
+                        "description": "Действующая редакция",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RulesView"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/selling/admission": {
+            "get": {
+                "tags": [
+                    "Правила продажи"
+                ],
+                "summary": "Мой допуск к продаже",
+                "description": "Что спрашивает кнопка «Продавать»: принята ли действующая редакция правил, сдан ли экзамен и можно ли заводить лоты. Новая редакция правил обнуляет допуск — принять и сдать придётся заново.",
+                "operationId": "get_api_selling_admission",
+                "responses": {
+                    "200": {
+                        "description": "Допуск владельца токена к действующей редакции",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdmissionView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Правила продажи"
+                ],
+                "summary": "Принять правила",
+                "description": "Галочка под списком правил. Клиент присылает номер редакции, которую показал человеку, — он сверяется с действующей. Повторное принятие ничего не меняет. Допуск этим ещё не выдан: дальше экзамен.",
+                "operationId": "post_api_selling_accept_rules",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcceptRulesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Правила приняты, можно открывать экзамен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdmissionView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "409": {
+                        "description": "Правила переизданы: принята не действующая редакция"
+                    },
+                    "422": {
+                        "description": "Галочка не проставлена или редакция не передана"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/selling/exam": {
+            "get": {
+                "tags": [
+                    "Правила продажи"
+                ],
+                "summary": "Экзамен по правилам",
+                "description": "Вопросы для модального окна. Верных вариантов в ответе нет и не будет: ответы проверяет площадка. У каждого вопроса указан пункт правил, из которого он взят.",
+                "operationId": "get_api_selling_exam",
+                "responses": {
+                    "200": {
+                        "description": "Вопросы действующей редакции",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ExamView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "409": {
+                        "description": "Правила ещё не приняты"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Правила продажи"
+                ],
+                "summary": "Сдать экзамен",
+                "description": "Ответы из модального окна: номер выбранного варианта по идентификатору вопроса. Экзамен сдан только без единой ошибки; в ответе на несданный приходят не разобранные вопросы, а пункты правил, которые стоит перечитать. После неудачной попытки держится минутная пауза — иначе экзамен сдаётся перебором. Сдан — canSell становится true, и форму лота можно открывать.",
+                "operationId": "post_api_selling_take_exam",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "answers"
+                                ],
+                                "properties": {
+                                    "answers": {
+                                        "type": "object",
+                                        "example": {
+                                            "escrow": 1,
+                                            "commission": 0
+                                        },
+                                        "additionalProperties": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Итог попытки",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ExamResultView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "409": {
+                        "description": "Правила ещё не приняты"
+                    },
+                    "422": {
+                        "description": "Отвечено не на все вопросы или ответ не номер варианта"
+                    },
+                    "429": {
+                        "description": "Слишком рано после неудачной попытки"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -1659,6 +1856,35 @@
                         "nullable": true,
                         "default": null,
                         "maxLength": 2000
+                    }
+                },
+                "type": "object"
+            },
+            "AcceptRulesRequest": {
+                "required": [
+                    "version"
+                ],
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
+                    "accepted": {
+                        "title": "Галочка снята — принимать нечего; заранее отмеченной она не бывает.",
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "type": "object"
+            },
+            "ExamAnswers": {
+                "properties": {
+                    "answers": {
+                        "type": "object",
+                        "default": [],
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
                     }
                 },
                 "type": "object"
@@ -2457,6 +2683,173 @@
                     }
                 },
                 "type": "object"
+            },
+            "RulesView": {
+                "required": [
+                    "version",
+                    "title",
+                    "body",
+                    "checksum",
+                    "questionsCount",
+                    "publishedAt"
+                ],
+                "properties": {
+                    "version": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "body": {
+                        "title": "Текст целиком, в Markdown: разбивать его на пункты — работа клиента.",
+                        "type": "string"
+                    },
+                    "checksum": {
+                        "title": "sha256 текста вместе с экзаменом: правка любого из двух меняет редакцию.",
+                        "type": "string"
+                    },
+                    "questionsCount": {
+                        "title": "Сколько вопросов в экзамене — чтобы клиент нарисовал прогресс до того, как откроет модалку.",
+                        "type": "integer"
+                    },
+                    "publishedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "AdmissionView": {
+                "required": [
+                    "rulesVersion",
+                    "rulesAccepted",
+                    "examPassed",
+                    "canSell",
+                    "attempts"
+                ],
+                "properties": {
+                    "rulesVersion": {
+                        "type": "string"
+                    },
+                    "rulesAccepted": {
+                        "type": "boolean"
+                    },
+                    "examPassed": {
+                        "type": "boolean"
+                    },
+                    "canSell": {
+                        "type": "boolean"
+                    },
+                    "attempts": {
+                        "type": "integer"
+                    },
+                    "acceptedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "passedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "retryAfter": {
+                        "title": "Когда откроется следующая попытка; null — прямо сейчас.",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "default": null
+                    }
+                },
+                "type": "object"
+            },
+            "ExamQuestionView": {
+                "required": [
+                    "id",
+                    "clause",
+                    "text",
+                    "options"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "clause": {
+                        "title": "Пункт правил, из которого взят вопрос: читать надо его, а не угадывать.",
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ExamView": {
+                "required": [
+                    "rulesVersion",
+                    "questions"
+                ],
+                "properties": {
+                    "rulesVersion": {
+                        "type": "string"
+                    },
+                    "questions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ExamQuestionView"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ExamResultView": {
+                "required": [
+                    "passed",
+                    "correct",
+                    "total",
+                    "clausesToReview",
+                    "canSell",
+                    "attempts"
+                ],
+                "properties": {
+                    "passed": {
+                        "type": "boolean"
+                    },
+                    "correct": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "clausesToReview": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "canSell": {
+                        "title": "Сразу после сдачи клиент открывает форму лота, не перезапрашивая допуск.",
+                        "type": "boolean"
+                    },
+                    "attempts": {
+                        "type": "integer"
+                    },
+                    "retryAfter": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "default": null
+                    }
+                },
+                "type": "object"
             }
         },
         "securitySchemes": {
@@ -2494,6 +2887,9 @@
         },
         {
             "name": "Персональные данные"
+        },
+        {
+            "name": "Правила продажи"
         }
     ]
 }

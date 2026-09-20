@@ -149,3 +149,63 @@ test('гостю показываются вход и регистрация', a
   expect(await screen.findByRole('link', { name: 'Войти' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Регистрация' })).toBeInTheDocument();
 });
+
+const noAdmission = {
+  rulesVersion: '1.0',
+  rulesAccepted: false,
+  examPassed: false,
+  canSell: false,
+  attempts: 0,
+  acceptedAt: null,
+  passedAt: null,
+  retryAfter: null,
+};
+
+const rules = {
+  version: '1.0',
+  title: 'Правила продажи и публикации',
+  body: '1.2. Перед первым лотом продавец принимает правила и сдаёт экзамен.',
+  checksum: 'sha256:abc',
+  questionsCount: 2,
+  publishedAt: '2026-09-01T10:00:00+00:00',
+};
+
+test('без допуска форма лота уводит на правила продажи', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  window.history.pushState({}, '', '/my/offers/new');
+  mockApi({
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/offers/mine': [200, { items: [] }],
+    'GET /api/selling/admission': [200, noAdmission],
+    'GET /api/selling/rules': [200, rules],
+  });
+
+  render(<App />);
+
+  expect(
+    await screen.findByRole('heading', { name: 'Как начать продавать', level: 1 }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Новый лот' })).not.toBeInTheDocument();
+});
+
+test('с допуском форма лота открывается', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  window.history.pushState({}, '', '/my/offers/new');
+  mockApi({
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/offers/mine': [200, { items: [] }],
+    'GET /api/games': [200, games],
+    'GET /api/selling/admission': [
+      200,
+      { ...noAdmission, rulesAccepted: true, examPassed: true, canSell: true, attempts: 1 },
+    ],
+  });
+
+  render(<App />);
+
+  expect(
+    await screen.findByRole('heading', { name: 'Новый лот', level: 1 }),
+  ).toBeInTheDocument();
+});

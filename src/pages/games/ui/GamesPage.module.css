@@ -27,12 +27,6 @@
   font-size: 18px;
 }
 
-.platforms {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 .more {
   margin-top: auto;
   color: var(--color-accent);

@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
-import { ApiError, register } from 'shared/api';
+import { ApiError, fetchPolicy, register } from 'shared/api';
 import type { PolicyView, UserView } from 'shared/api';
 import { formatDateTime, useAsyncData } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
@@ -8,7 +8,6 @@ import { Button } from 'shared/ui/Button';
 import { Checkbox } from 'shared/ui/Checkbox';
 import { Spinner } from 'shared/ui/Spinner';
 import { TextField } from 'shared/ui/TextField';
-import { fetchPolicy } from '../api/fetch-policy';
 import styles from './AuthForm.module.css';
 
 const PASSWORD_MIN_LENGTH = 8;
@@ -24,8 +23,6 @@ export function RegisterPage() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [personalDataConsent, setPersonalDataConsent] = useState(false);
-  const [isAdult, setIsAdult] = useState(false);
-  const [publicProfileConsent, setPublicProfileConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [missingConsent, setMissingConsent] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -44,9 +41,9 @@ export function RegisterPage() {
       return;
     }
 
-    // Обязательные согласия сторожим на месте: снятая галочка — это не ошибка
+    // Обязательное согласие сторожим на месте: снятая галочка — это не ошибка
     // ввода, за которой стоит идти на бэкенд, а незаданный вопрос.
-    if (!personalDataConsent || !isAdult) {
+    if (!personalDataConsent) {
       setMissingConsent(true);
       setError(null);
       return;
@@ -64,8 +61,10 @@ export function RegisterPage() {
           displayName,
           policyVersion: policy.version,
           personalDataConsent,
-          isAdult,
-          publicProfileConsent,
+          // Совершеннолетие бэкенд требует отдельным полем (`Assert\IsTrue`), а
+          // спрашиваем мы его одной галочкой с согласием: два вопроса в одной
+          // подписи, поэтому и значение одно.
+          isAdult: personalDataConsent,
           marketingConsent,
         }),
       );
@@ -171,41 +170,27 @@ export function RegisterPage() {
           <fieldset className={styles.consents}>
             <legend className={styles.consentsTitle}>Персональные данные</legend>
 
-            <details className={styles.policy}>
-              <summary className={styles.policySummary}>
+            {/* Текст живёт отдельной страницей: в новой вкладке, чтобы
+                заполненная форма не потерялась по дороге. */}
+            <p className={styles.policyLink}>
+              <Link to="/privacy" target="_blank" rel="noreferrer">
                 {policy.title} — редакция {policy.version} от {formatDateTime(policy.publishedAt)}
-              </summary>
-              <div className={styles.policyBody}>{policy.body}</div>
-            </details>
+              </Link>
+            </p>
 
             <Checkbox
-              label={`Даю согласие на обработку моих персональных данных на условиях политики (редакция ${policy.version})`}
+              label={`Мне есть 18 лет, и я даю согласие на обработку моих персональных данных на условиях политики (редакция ${policy.version})`}
               name="personalDataConsent"
               checked={personalDataConsent}
               onChange={(event) => setPersonalDataConsent(event.target.checked)}
               error={
                 violation('personalDataConsent') ??
-                violation('policyVersion') ??
-                (missingConsent && !personalDataConsent ? 'Без согласия аккаунт не завести' : undefined)
-              }
-            />
-            <Checkbox
-              label="Мне есть 18 лет"
-              name="isAdult"
-              checked={isAdult}
-              onChange={(event) => setIsAdult(event.target.checked)}
-              error={
                 violation('isAdult') ??
-                (missingConsent && !isAdult ? 'Площадка работает только со взрослыми' : undefined)
+                violation('policyVersion') ??
+                (missingConsent
+                  ? 'Без подтверждения возраста и согласия аккаунт не завести'
+                  : undefined)
               }
-            />
-            <Checkbox
-              label="Показывать мой профиль в открытой части площадки"
-              name="publicProfileConsent"
-              checked={publicProfileConsent}
-              onChange={(event) => setPublicProfileConsent(event.target.checked)}
-              hint="По желанию: без этого согласия профиль не попадёт в публичные списки"
-              error={violation('publicProfileConsent')}
             />
             <Checkbox
               label="Получать письма о новинках и акциях"

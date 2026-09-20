@@ -48,10 +48,9 @@ test('отправляет редакцию политики и выбранны
   });
 
   renderPage();
-  await screen.findByText(/редакция 1\.0/, { selector: 'summary' });
+  await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
-  await userEvent.click(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ }));
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Мне есть 18 лет' }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ }));
   await userEvent.click(screen.getByRole('checkbox', { name: /новинках и акциях/ }));
   await submit();
 
@@ -63,21 +62,21 @@ test('отправляет редакцию политики и выбранны
     policyVersion: '1.0',
     personalDataConsent: true,
     isAdult: true,
-    publicProfileConsent: false,
     marketingConsent: true,
   });
 });
 
-test('без обязательных согласий не ходит на бэкенд', async () => {
+test('без обязательного согласия не ходит на бэкенд', async () => {
   mockApi({ 'GET /api/privacy/policy': [200, policy] });
 
   renderPage();
-  await screen.findByText(/редакция 1\.0/, { selector: 'summary' });
+  await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
   await submit();
 
-  expect(await screen.findByText('Без согласия аккаунт не завести')).toBeInTheDocument();
-  expect(screen.getByText('Площадка работает только со взрослыми')).toBeInTheDocument();
+  expect(
+    await screen.findByText('Без подтверждения возраста и согласия аккаунт не завести'),
+  ).toBeInTheDocument();
   expect(requestBody('POST', '/api/auth/register')).toBeUndefined();
 });
 
@@ -88,16 +87,14 @@ test('переизданная политика просит согласить�
   mockFetchOnce(200, { ...policy, version: '1.1', body: 'Редакция 1.1.' });
 
   renderPage();
-  await screen.findByText(/редакция 1\.0/, { selector: 'summary' });
+  await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
-  await userEvent.click(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ }));
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Мне есть 18 лет' }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ }));
   await submit();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('теперь действует редакция 1.1');
-  expect(screen.getByText(/редакция 1\.1/, { selector: 'summary' })).toBeInTheDocument();
-  expect(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ })).not.toBeChecked();
-  expect(screen.getByRole('checkbox', { name: 'Мне есть 18 лет' })).toBeChecked();
+  expect(screen.getByRole('link', { name: /редакция 1\.1/ })).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ })).not.toBeChecked();
 });
 
 test('409 при действующей редакции — это занятая почта', async () => {
@@ -106,10 +103,9 @@ test('409 при действующей редакции — это занята
   mockFetchOnce(200, policy);
 
   renderPage();
-  await screen.findByText(/редакция 1\.0/, { selector: 'summary' });
+  await screen.findByRole('link', { name: /редакция 1\.0/ });
   await fillCredentials();
-  await userEvent.click(screen.getByRole('checkbox', { name: /Даю согласие на обработку/ }));
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Мне есть 18 лет' }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Мне есть 18 лет/ }));
   await submit();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Эта почта уже занята');
@@ -123,4 +119,17 @@ test('без политики регистрироваться нечем', asyn
   expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить политику');
   expect(screen.getByRole('button', { name: 'Зарегистрироваться' })).toBeDisabled();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+});
+
+test('текст политики лежит на отдельной странице, а не в форме', async () => {
+  mockApi({ 'GET /api/privacy/policy': [200, policy] });
+
+  renderPage();
+
+  const link = await screen.findByRole('link', { name: /редакция 1\.0/ });
+  expect(link).toHaveAttribute('href', '/privacy');
+  // Новая вкладка: иначе заполненная форма потеряется по дороге к тексту.
+  expect(link).toHaveAttribute('target', '_blank');
+  expect(screen.queryByText(policy.body)).not.toBeInTheDocument();
+  expect(screen.queryByRole('checkbox', { name: /профиль в открытой части/ })).not.toBeInTheDocument();
 });

@@ -191,3 +191,16 @@ test('упавший запрос своих лотов не ломает кат
   expect(await screen.findByRole('link', { name: /Чужой аккаунт/ })).toBeInTheDocument();
   expect(screen.queryByText('Всё сломалось')).not.toBeInTheDocument();
 });
+
+test('из каталога есть вход в заведение лота', async () => {
+  mockApi({
+    'GET /api/games/dota-2': [200, game],
+    'GET /api/games/dota-2/offers': [200, { items: [offer('o-1', 'Чужой аккаунт', 3)] }],
+  });
+
+  renderPage();
+
+  // Гостю кнопку тоже показываем: RequireAuth заведёт его на вход и вернёт обратно.
+  const sell = await screen.findByRole('link', { name: 'Продавать' });
+  expect(sell).toHaveAttribute('href', '/my/offers/new');
+});

@@ -24,11 +24,9 @@ export function GamesPage() {
       return games;
     }
 
-    return games.filter(
-      (game) =>
-        game.title.toLowerCase().includes(needle) ||
-        game.platforms.some((platform) => platform.toLowerCase().includes(needle)),
-    );
+    // Ищем только по названию: платформы на витрине не показываются, а искать
+    // по тому, чего на карточке нет, — это выдача без видимой причины.
+    return games.filter((game) => game.title.toLowerCase().includes(needle));
   }, [games, deferredQuery]);
 
   return (

@@ -6,15 +6,18 @@ import { GamePage } from 'pages/game';
 import { LoginPage } from 'pages/login';
 import { RegisterPage } from 'pages/register';
 import { ConfirmEmailPage } from 'pages/confirm-email';
+import { PrivacyPolicyPage } from 'pages/privacy-policy';
 import { OfferPage } from 'pages/offer';
 import { OrderPage } from 'pages/order';
 import { OrdersPage } from 'pages/orders';
 import { MyOffersPage } from 'pages/my-offers';
 import { OfferEditorPage } from 'pages/offer-editor';
+import { SellingPage } from 'pages/selling';
 import { WalletPage } from 'pages/wallet';
 import { NotFoundPage } from 'pages/not-found';
 import { GuestOnly } from './ui/GuestOnly';
 import { RequireAuth } from './ui/RequireAuth';
+import { RequireSellingAdmission } from './ui/RequireSellingAdmission';
 import { RootLayout } from './ui/RootLayout';
 import './styles/global.css';
 
@@ -52,11 +55,15 @@ export function App() {
                   </RequireAuth>
                 }
               />
+              <Route path="privacy" element={<PrivacyPolicyPage />} />
+              <Route path="selling" element={<SellingPage />} />
               <Route
                 path="my/offers/new"
                 element={
                   <RequireAuth>
-                    <OfferEditorPage />
+                    <RequireSellingAdmission>
+                      <OfferEditorPage />
+                    </RequireSellingAdmission>
                   </RequireAuth>
                 }
               />

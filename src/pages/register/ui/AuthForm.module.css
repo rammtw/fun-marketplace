@@ -63,27 +63,15 @@
   letter-spacing: 0.04em;
 }
 
-.policy {
+.policyLink {
+  margin: 0;
+  padding: 10px 12px;
   border-radius: 10px;
   background: var(--color-surface-sunken);
-}
-
-.policySummary {
-  padding: 10px 12px;
-  color: var(--color-accent);
   font-size: 13px;
   line-height: 1.4;
-  cursor: pointer;
 }
 
-/* Текст политики приходит разметкой markdown; показываем как есть,
-   таблицы в нём держатся на выравнивании пробелами. */
-.policyBody {
-  max-height: 320px;
-  padding: 0 12px 12px;
-  overflow: auto;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.policyLink a {
+  color: var(--color-accent);
 }
