@@ -1,18 +1,30 @@
+import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { fetchOrder } from 'pages/order/api/fetch-order';
 import { orderStatus } from 'entities/order';
 import { ApiError } from 'shared/api';
+import type { OrderView } from 'shared/api';
 import { useSession } from 'shared/auth';
 import { formatDateTime, formatMoney, useAsyncData } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
 import { Badge } from 'shared/ui/Badge';
 import { Spinner } from 'shared/ui/Spinner';
+import { DeliverPanel } from './DeliverPanel';
 import styles from './OrderPage.module.css';
 
 export function OrderPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { user } = useSession();
-  const { data: order, error, loading } = useAsyncData((signal) => fetchOrder(id, signal), [id]);
+  const { data, error, loading, reload } = useAsyncData((signal) => fetchOrder(id, signal), [id]);
+  // Ручка выдачи возвращает заказ целиком, так что после неё показываем ответ,
+  // а не перечитываем. Сверка по id гасит накладку при переходе на другой заказ.
+  const [delivered, setDelivered] = useState<OrderView | null>(null);
+  const order = delivered?.id === id ? delivered : data;
+
+  const handleStale = useCallback(() => {
+    setDelivered(null);
+    reload();
+  }, [reload]);
 
   if (error instanceof ApiError && error.status === 404) {
     return (
@@ -34,8 +46,9 @@ export function OrderPage() {
 
   const status = orderStatus(order.status);
   const isSeller = user?.id === order.sellerId;
-  // Товар выдаётся сразу, услуга ждёт продавца — покупателю важно понимать, чего ждать.
-  const awaitingSeller = order.deliveredItems.length === 0 && !order.deliveredAt;
+  // Товар с автовыдачей уходит покупателю сразу, услуга ждёт продавца: в статусе
+  // paid выдача ещё за ним, и только он её может закрыть.
+  const awaitingSeller = order.status === 'paid' && order.deliveredItems.length === 0;
 
   return (
     <div className={styles.card}>
@@ -89,11 +102,26 @@ export function OrderPage() {
             ))}
           </ul>
         </div>
-      ) : awaitingSeller ? (
+      ) : null}
+
+      {order.deliveryNote ? (
         <div className={styles.delivered}>
-          <Alert tone="info">
-            Деньги удерживаются в эскроу и уйдут продавцу после того, как он выполнит заказ.
-          </Alert>
+          <h2 className={styles.deliveredTitle}>
+            {isSeller ? 'Что вы передали' : 'Что передал продавец'}
+          </h2>
+          <p className={styles.deliveryNote}>{order.deliveryNote}</p>
+        </div>
+      ) : null}
+
+      {awaitingSeller ? (
+        <div className={styles.delivered}>
+          {isSeller ? (
+            <DeliverPanel order={order} onDelivered={setDelivered} onStale={handleStale} />
+          ) : (
+            <Alert tone="info">
+              Деньги удерживаются в эскроу и уйдут продавцу после того, как он выполнит заказ.
+            </Alert>
+          )}
         </div>
       ) : null}
 

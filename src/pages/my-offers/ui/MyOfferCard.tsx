@@ -64,6 +64,16 @@ export function MyOfferCard({ offer, onPublish, onPause, onArchive, busy }: MyOf
             Изменить
           </Link>
 
+          {/* Автовыдача закрывает заказ сама, ждать выдачи там нечему. */}
+          {offer.deliveryType === 'manual' ? (
+            <Link
+              className={styles.action}
+              to={`/orders?role=seller&status=paid&offerId=${offer.id}`}
+            >
+              Очередь выдачи
+            </Link>
+          ) : null}
+
           {offer.status === 'active' ? (
             <Link className={styles.action} to={`/offers/${offer.id}`}>
               Посмотреть на витрине

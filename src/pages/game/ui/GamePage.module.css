@@ -11,19 +11,18 @@
 }
 
 .header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
 .title {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 30px;
   line-height: 1.2;
-}
-
-.platforms {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 .filters {

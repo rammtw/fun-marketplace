@@ -8,16 +8,54 @@ export interface paths {
   "/api/wallet": {
     /**
      * Баланс
-     * @description available — свободные деньги, held — удержанные по заказам.
+     * @description available — свободные деньги, held — удержанные по заказам и выплатам в пути.
      */
     get: operations["get_api_wallet_balance"];
   };
-  "/api/wallet/deposit": {
+  "/api/wallet/deposits": {
     /**
-     * Пополнить счёт
-     * @description Заглушка вместо платёжного провайдера: деньги зачисляются без оплаты. Нужна, чтобы покупку можно было довести до конца.
+     * Мои пополнения
+     * @description История пополнений владельца токена, свежие сверху.
      */
-    post: operations["post_api_wallet_deposit"];
+    get: operations["get_api_wallet_deposits"];
+    /**
+     * Пополнить кошелёк
+     * @description Заводит платёж в ЮKassa и возвращает confirmationUrl — адрес, на который нужно отправить человека платить. Деньги на балансе появятся только после оплаты: сразу после этого запроса пополнение в статусе pending. returnUrl необязателен и обязан вести на домен площадки; без него ЮKassa вернёт человека на адрес кошелька из настроек.
+     */
+    post: operations["post_api_wallet_create_deposit"];
+  };
+  "/api/wallet/deposits/{id}": {
+    /**
+     * Статус пополнения
+     * @description Ручка, которую клиент опрашивает после возврата с оплаты. Пока пополнение в pending, она спрашивает статус у ЮKassa и, если платёж прошёл, зачисляет деньги — уведомление провайдера для этого не требуется.
+     */
+    get: operations["get_api_wallet_deposit"];
+  };
+  "/api/wallet/payouts": {
+    /**
+     * Мои выплаты
+     * @description История выводов владельца токена, свежие сверху.
+     */
+    get: operations["get_api_wallet_payouts"];
+    /**
+     * Вывести деньги на карту
+     * @description Сумма удерживается на кошельке и уходит в ЮKassa. payoutToken — синоним карты, который клиент получает в виджете выплат ЮKassa; номер карты через площадку не проходит. Деньги списываются окончательно только после подтверждения провайдера, при отказе удержание снимается.
+     */
+    post: operations["post_api_wallet_create_payout"];
+  };
+  "/api/wallet/payouts/{id}": {
+    /**
+     * Статус выплаты
+     * @description Пока выплата в pending, ручка спрашивает статус у ЮKassa: деньги либо списываются окончательно, либо возвращаются в доступные.
+     */
+    get: operations["get_api_wallet_payout"];
+  };
+  "/api/webhooks/yookassa": {
+    /**
+     * Уведомление ЮKassa
+     * @description Служебная ручка для провайдера, фронтенду не нужна. Принимает тело уведомления (type, event, object) и отвечает 200. Статус операции берётся не отсюда, а запросом в ЮKassa, поэтому подпись уведомления не проверяется.
+     */
+    post: operations["post_api_webhooks_yookassa"];
   };
   "/api/games": {
     /**
@@ -43,7 +81,7 @@ export interface paths {
   "/api/auth/register": {
     /**
      * Зарегистрировать аккаунт
-     * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя.
+     * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку обязательно, публичный профиль и рассылки — по желанию.
      */
     post: operations["post_api_auth_register"];
   };
@@ -75,7 +113,7 @@ export interface paths {
   "/api/users": {
     /**
      * Публичные профили
-     * @description Почта и хеш пароля наружу не отдаются никогда.
+     * @description Только те, кто согласился показывать профиль в открытой части площадки: публичный список — это распространение персональных данных (ст. 10.1 152-ФЗ). Почта и хеш пароля наружу не отдаются никогда.
      */
     get: operations["get_api_users_list"];
   };
@@ -99,14 +137,14 @@ export interface paths {
     delete: operations["delete_api_seller_offers_archive"];
     /**
      * Поправить лот
-     * @description Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.
+     * @description Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Публикация требует действующего допуска к продаже, снятие и архив — нет. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.
      */
     patch: operations["patch_api_seller_offers_update"];
   };
   "/api/offers": {
     /**
      * Завести лот
-     * @description Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них.
+     * @description Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них. До первого лота продавец принимает правила продажи и сдаёт экзамен по ним: GET /api/selling/rules, POST /api/selling/admission, POST /api/selling/exam.
      */
     post: operations["post_api_seller_offers_create"];
   };
@@ -143,21 +181,147 @@ export interface paths {
      */
     get: operations["get_api_orders_show"];
   };
+  "/api/orders/{id}/deliver": {
+    /**
+     * Выдать заказ
+     * @description Продавец закрывает ручную выдачу: услуга оказана или товар передан. Что именно передано, уезжает в deliveryNote и видно обеим сторонам. Товар с автовыдачей сюда не приходит — он выдан в момент покупки. Деньги остаются в эскроу.
+     */
+    post: operations["post_api_orders_deliver"];
+  };
+  "/api/privacy/policy": {
+    /**
+     * Политика обработки персональных данных
+     * @description Действующая редакция целиком. Ручка открыта всем: политику оператор обязан опубликовать в неограниченном доступе (ч. 2 ст. 18.1 152-ФЗ). Номер редакции отсюда клиент присылает обратно при регистрации.
+     */
+    get: operations["get_api_privacy_policy"];
+  };
+  "/api/privacy/consents": {
+    /**
+     * Мои согласия
+     * @description История: и действующие согласия, и отозванные. Отозванное не исчезает — им оператор подтверждает, что обработка была правомерной.
+     */
+    get: operations["get_api_privacy_consents"];
+    /**
+     * Дать согласие
+     * @description Для целей, от которых можно отказаться: публичный профиль и рассылки. Повторное согласие на ту же цель ничего не меняет.
+     */
+    post: operations["post_api_privacy_grant_consent"];
+  };
+  "/api/privacy/consents/{purpose}": {
+    /**
+     * Отозвать согласие
+     * @description Отзыв — безусловное право (ч. 2 ст. 9 152-ФЗ) и исполняется сразу. Обязательное согласие на обработку так отозвать нельзя: без него аккаунта не существует, и это уже требование об уничтожении данных.
+     */
+    delete: operations["delete_api_privacy_revoke_consent"];
+  };
+  "/api/privacy/me": {
+    /**
+     * Сведения об обработке моих данных
+     * @description Ответ на запрос по ст. 14 152-ФЗ: оператор, цели и основания, состав данных, сроки хранения, получатели, история согласий. Закон даёт на такой ответ десять рабочих дней — площадка отвечает сразу.
+     */
+    get: operations["get_api_privacy_me"];
+  };
+  "/api/privacy/requests": {
+    /**
+     * Мои обращения по персональным данным
+     * @description Журнал обращений в части, касающейся заявителя, со сроком ответа по каждому.
+     */
+    get: operations["get_api_privacy_requests"];
+    /**
+     * Подать обращение
+     * @description Запрос сведений, уточнение данных, отзыв согласия. Обращение попадает в журнал с посчитанным сроком ответа.
+     */
+    post: operations["post_api_privacy_file_request"];
+  };
+  "/api/privacy/erasure": {
+    /**
+     * Потребовать уничтожения моих данных
+     * @description Исполняется сразу: данные аккаунта обезличиваются, согласия отзываются, выдаётся акт об уничтожении. Войти в аккаунт после этого нельзя. Заказы и записи реестра остаются обезличенными — их хранение обязательно по 402-ФЗ.
+     */
+    post: operations["post_api_privacy_erasure"];
+  };
+  "/api/selling/rules": {
+    /**
+     * Правила продажи и публикации
+     * @description Действующая редакция целиком, в Markdown. Ручка открыта всем: правила читают до того, как решают продавать. Номер редакции отсюда клиент присылает обратно вместе с принятием.
+     */
+    get: operations["get_api_selling_rules"];
+  };
+  "/api/selling/admission": {
+    /**
+     * Мой допуск к продаже
+     * @description Что спрашивает кнопка «Продавать»: принята ли действующая редакция правил, сдан ли экзамен и можно ли заводить лоты. Новая редакция правил обнуляет допуск — принять и сдать придётся заново.
+     */
+    get: operations["get_api_selling_admission"];
+    /**
+     * Принять правила
+     * @description Галочка под списком правил. Клиент присылает номер редакции, которую показал человеку, — он сверяется с действующей. Повторное принятие ничего не меняет. Допуск этим ещё не выдан: дальше экзамен.
+     */
+    post: operations["post_api_selling_accept_rules"];
+  };
+  "/api/selling/exam": {
+    /**
+     * Экзамен по правилам
+     * @description Вопросы для модального окна. Верных вариантов в ответе нет и не будет: ответы проверяет площадка. У каждого вопроса указан пункт правил, из которого он взят.
+     */
+    get: operations["get_api_selling_exam"];
+    /**
+     * Сдать экзамен
+     * @description Ответы из модального окна: номер выбранного варианта по идентификатору вопроса. Экзамен сдан только без единой ошибки; в ответе на несданный приходят не разобранные вопросы, а пункты правил, которые стоит перечитать. После неудачной попытки держится минутная пауза — иначе экзамен сдаётся перебором. Сдан — canSell становится true, и форму лота можно открывать.
+     */
+    post: operations["post_api_selling_take_exam"];
+  };
 }
 
 export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
-    DepositRequest: {
+    TopUpRequest: {
       /** Сумма в копейках: рубли с копейками во float — потерянная копейка. */
       amount: number;
+      /**
+       * Куда ЮKassa вернёт человека после оплаты. Необязателен: если клиент
+       * ничего не прислал, берётся адрес кошелька из настроек. Чужой домен
+       * сюда не проходит — иначе площадка становится чужим редиректом.
+       * @default null
+       */
+      returnUrl?: string | null;
+    };
+    PayoutRequest: {
+      /** Сумма в копейках. */
+      amount: number;
+      payoutToken: string;
     };
     RegistrationRequest: {
       email: string;
       /** Верхняя граница — не придирка, а предел bcrypt: всё после 72 байт молча отбрасывается. */
       password: string;
+      /** Псевдоним для витрины: настоящее имя тут не нужно и не спрашивается. */
       displayName: string;
+      /**
+       * Редакция политики, которую клиент показал человеку. Приходит от него
+       * же и сверяется с действующей: согласие под текст, которого человек не
+       * видел, информированным не является (ч. 1 ст. 9 152-ФЗ).
+       */
+      policyVersion: string;
+      /**
+       * Согласие на обработку. Обязательное и невыставленное по умолчанию:
+       * молчание и заранее отмеченная галочка согласием не считаются.
+       */
+      personalDataConsent: boolean;
+      /**
+       * Показывать профиль в открытой части площадки. Это распространение
+       * персональных данных, и по ч. 6 ст. 10.1 согласие на него отдельное —
+       * поэтому отдельное поле, а не часть галочки выше.
+       * @default false
+       */
+      publicProfileConsent?: boolean;
+      /**
+       * Рассылки. По умолчанию выключены — иначе это не согласие, а уведомление.
+       * @default false
+       */
+      marketingConsent?: boolean;
     };
     ResendConfirmationRequest: {
       email: string;
@@ -205,6 +369,43 @@ export interface components {
       /** @default 1 */
       quantity?: number;
     };
+    DeliverOrderRequest: {
+      note: string;
+    };
+    /** @enum {string} */
+    ConsentPurpose: "processing" | "distribution" | "marketing";
+    GrantConsentRequest: {
+      purpose: components["schemas"]["ConsentPurpose"];
+    };
+    /** @enum {string} */
+    SubjectRequestKind: "access" | "rectification" | "revocation" | "erasure";
+    FileSubjectRequest: {
+      kind: components["schemas"]["SubjectRequestKind"];
+      /**
+       * Суть обращения: для уточнения данных без неё нечего делать.
+       * @default null
+       */
+      comment?: string | null;
+    };
+    ErasureRequest: {
+      confirm: boolean;
+      /** @default null */
+      comment?: string | null;
+    };
+    AcceptRulesRequest: {
+      version: string;
+      /**
+       * Галочка снята — принимать нечего; заранее отмеченной она не бывает.
+       * @default false
+       */
+      accepted?: boolean;
+    };
+    ExamAnswers: {
+      /** @default [] */
+      answers?: {
+        [key: string]: number;
+      };
+    };
     Money: {
       amount: number;
       /** @default RUB */
@@ -214,6 +415,34 @@ export interface components {
       userId: string;
       available: components["schemas"]["Money"];
       held: components["schemas"]["Money"];
+    };
+    /** @enum {string} */
+    DepositStatus: "pending" | "succeeded" | "canceled";
+    DepositView: {
+      id: string;
+      amount: components["schemas"]["Money"];
+      status: components["schemas"]["DepositStatus"];
+      confirmationUrl?: string | null;
+      paymentId?: string | null;
+      cancellationReason?: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      completedAt?: string | null;
+    };
+    /** @enum {string} */
+    PayoutStatus: "pending" | "succeeded" | "canceled";
+    PayoutView: {
+      id: string;
+      amount: components["schemas"]["Money"];
+      status: components["schemas"]["PayoutStatus"];
+      cardLast4?: string | null;
+      payoutId?: string | null;
+      cancellationReason?: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      completedAt?: string | null;
     };
     GameSummary: {
       id: number;
@@ -240,7 +469,7 @@ export interface components {
       sections: components["schemas"]["SectionView"][];
     };
     /** @enum {string} */
-    UserStatus: "pending" | "active" | "limited" | "banned";
+    UserStatus: "pending" | "active" | "limited" | "banned" | "erased";
     UserView: {
       id: string;
       displayName: string;
@@ -340,6 +569,153 @@ export interface components {
       /** Format: date-time */
       deliveredAt?: string | null;
       deliveredItems: string[];
+      /** @default null */
+      deliveryNote?: string | null;
+    };
+    PolicyView: {
+      version: string;
+      title: string;
+      body: string;
+      /** sha256 текста: клиент может убедиться, что показывает то же, под чем подписался. */
+      checksum: string;
+      /** Format: date-time */
+      publishedAt: string;
+    };
+    ConsentView: {
+      purpose: components["schemas"]["ConsentPurpose"];
+      title: string;
+      legalBasis: string;
+      retention: string;
+      policyVersion: string;
+      /** Format: date-time */
+      grantedAt: string;
+      /** Format: date-time */
+      revokedAt?: string | null;
+      ip?: string | null;
+      userAgent?: string | null;
+    };
+    AccountPersonalData: {
+      id: string;
+      email: string;
+      displayName: string;
+      status: components["schemas"]["UserStatus"];
+      /** Format: date-time */
+      registeredAt: string;
+      /** Format: date-time */
+      lastSeenAt?: string | null;
+    };
+    ProcessingPurposeView: {
+      purpose: components["schemas"]["ConsentPurpose"];
+      title: string;
+      legalBasis: string;
+      retention: string;
+      /** Действует ли согласие на эту цель прямо сейчас. */
+      granted: boolean;
+    };
+    PersonalDataView: {
+      /** Оператор: кому адресовать претензию, если что-то пошло не так. */
+      operator: string;
+      /** Действующая редакция политики. */
+      policyVersion: string;
+      account: components["schemas"]["AccountPersonalData"];
+      purposes: components["schemas"]["ProcessingPurposeView"][];
+      /** Категории обрабатываемых данных, включая те, что появились не в профиле. */
+      categories: string[];
+      /** Кому данные передаются и передаются ли вообще. */
+      recipients: string[];
+      /** История согласий: и действующие, и отозванные. */
+      consents: components["schemas"]["ConsentView"][];
+    };
+    /** @enum {string} */
+    SubjectRequestStatus: "received" | "fulfilled" | "rejected";
+    SubjectRequestView: {
+      id: string;
+      kind: components["schemas"]["SubjectRequestKind"];
+      title: string;
+      status: components["schemas"]["SubjectRequestStatus"];
+      comment?: string | null;
+      /** Format: date-time */
+      submittedAt: string;
+      /**
+       * Крайний срок ответа по 152-ФЗ, посчитанный при приёме обращения.
+       * Format: date-time
+       */
+      dueAt: string;
+      /** Format: date-time */
+      resolvedAt?: string | null;
+      resolution?: string | null;
+    };
+    /** @enum {string} */
+    DestructionReason: "consent_withdrawn" | "retention_expired" | "unlawful_processing";
+    DestructionActView: {
+      number: string;
+      subjectId: string;
+      categories: string[];
+      reason: components["schemas"]["DestructionReason"];
+      reasonTitle: string;
+      method: string;
+      /** Format: date-time */
+      destroyedAt: string;
+    };
+    RulesView: {
+      version: string;
+      title: string;
+      /** Текст целиком, в Markdown: разбивать его на пункты — работа клиента. */
+      body: string;
+      /** sha256 текста вместе с экзаменом: правка любого из двух меняет редакцию. */
+      checksum: string;
+      /** Сколько вопросов в экзамене — чтобы клиент нарисовал прогресс до того, как откроет модалку. */
+      questionsCount: number;
+      /** Format: date-time */
+      publishedAt: string;
+    };
+    AdmissionView: {
+      rulesVersion: string;
+      rulesAccepted: boolean;
+      examPassed: boolean;
+      canSell: boolean;
+      attempts: number;
+      /**
+       * Format: date-time
+       * @default null
+       */
+      acceptedAt?: string | null;
+      /**
+       * Format: date-time
+       * @default null
+       */
+      passedAt?: string | null;
+      /**
+       * Когда откроется следующая попытка; null — прямо сейчас.
+       * Format: date-time
+       * @default null
+       */
+      retryAfter?: string | null;
+    };
+    ExamQuestionView: {
+      id: string;
+      /** Пункт правил, из которого взят вопрос: читать надо его, а не угадывать. */
+      clause: string;
+      text: string;
+      options: string[];
+    };
+    ExamView: {
+      rulesVersion: string;
+      questions: components["schemas"]["ExamQuestionView"][];
+    };
+    ExamResultView: {
+      passed: boolean;
+      correct: number;
+      total: number;
+      clausesToReview: string[];
+      /** Сразу после сдачи клиент открывает форму лота, не перезапрашивая допуск. */
+      canSell: boolean;
+      attempts: number;
+      /**
+       * Format: date-time
+       * @default null
+       */
+      retryAfter?: string | null;
     };
   };
   responses: never;
@@ -357,7 +733,7 @@ export interface operations {
 
   /**
    * Баланс
-   * @description available — свободные деньги, held — удержанные по заказам.
+   * @description available — свободные деньги, held — удержанные по заказам и выплатам в пути.
    */
   get_api_wallet_balance: {
     responses: {
@@ -374,28 +750,204 @@ export interface operations {
     };
   };
   /**
-   * Пополнить счёт
-   * @description Заглушка вместо платёжного провайдера: деньги зачисляются без оплаты. Нужна, чтобы покупку можно было довести до конца.
+   * Мои пополнения
+   * @description История пополнений владельца токена, свежие сверху.
    */
-  post_api_wallet_deposit: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["DepositRequest"];
-      };
-    };
+  get_api_wallet_deposits: {
     responses: {
-      /** @description Баланс после пополнения */
+      /** @description Пополнения */
       200: {
         content: {
-          "application/json": components["schemas"]["WalletView"];
+          "application/json": {
+            items?: components["schemas"]["DepositView"][];
+          };
         };
       };
       /** @description Токен не передан, истёк или недействителен */
       401: {
         content: never;
       };
-      /** @description Сумма не прошла валидацию */
+    };
+  };
+  /**
+   * Пополнить кошелёк
+   * @description Заводит платёж в ЮKassa и возвращает confirmationUrl — адрес, на который нужно отправить человека платить. Деньги на балансе появятся только после оплаты: сразу после этого запроса пополнение в статусе pending. returnUrl необязателен и обязан вести на домен площадки; без него ЮKassa вернёт человека на адрес кошелька из настроек.
+   */
+  post_api_wallet_create_deposit: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TopUpRequest"];
+      };
+    };
+    responses: {
+      /** @description Платёж заведён, можно вести человека платить */
+      201: {
+        content: {
+          "application/json": components["schemas"]["DepositView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Сумма меньше рубля или адрес возврата ведёт на чужой домен */
       422: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила или отказала: платёж не заведён, повторить запрос можно */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Статус пополнения
+   * @description Ручка, которую клиент опрашивает после возврата с оплаты. Пока пополнение в pending, она спрашивает статус у ЮKassa и, если платёж прошёл, зачисляет деньги — уведомление провайдера для этого не требуется.
+   */
+  get_api_wallet_deposit: {
+    parameters: {
+      path: {
+        /** @description Идентификатор пополнения */
+        id: string;
+      };
+    };
+    responses: {
+      /** @description Пополнение */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DepositView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Пополнения нет или оно чужое */
+      404: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила: статус остался прежним */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Мои выплаты
+   * @description История выводов владельца токена, свежие сверху.
+   */
+  get_api_wallet_payouts: {
+    responses: {
+      /** @description Выплаты */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["PayoutView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Вывести деньги на карту
+   * @description Сумма удерживается на кошельке и уходит в ЮKassa. payoutToken — синоним карты, который клиент получает в виджете выплат ЮKassa; номер карты через площадку не проходит. Деньги списываются окончательно только после подтверждения провайдера, при отказе удержание снимается.
+   */
+  post_api_wallet_create_payout: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PayoutRequest"];
+      };
+    };
+    responses: {
+      /** @description Выплата отправлена */
+      201: {
+        content: {
+          "application/json": components["schemas"]["PayoutView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description На кошельке недостаточно свободных денег */
+      409: {
+        content: never;
+      };
+      /** @description Сумма меньше минимальной или не передан синоним карты */
+      422: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила или отказала: удержание снято, деньги на месте */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Статус выплаты
+   * @description Пока выплата в pending, ручка спрашивает статус у ЮKassa: деньги либо списываются окончательно, либо возвращаются в доступные.
+   */
+  get_api_wallet_payout: {
+    parameters: {
+      path: {
+        /** @description Идентификатор выплаты */
+        id: string;
+      };
+    };
+    responses: {
+      /** @description Выплата */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PayoutView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Выплаты нет или она чужая */
+      404: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила: статус остался прежним */
+      502: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Уведомление ЮKassa
+   * @description Служебная ручка для провайдера, фронтенду не нужна. Принимает тело уведомления (type, event, object) и отвечает 200. Статус операции берётся не отсюда, а запросом в ЮKassa, поэтому подпись уведомления не проверяется.
+   */
+  post_api_webhooks_yookassa: {
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @example notification */
+          type?: string;
+          /** @example payment.succeeded */
+          event?: string;
+          object?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description Уведомление принято */
+      200: {
+        content: never;
+      };
+      /** @description Тело запроса не разобрать */
+      400: {
+        content: never;
+      };
+      /** @description ЮKassa не ответила на запрос статуса: уведомление стоит повторить */
+      502: {
         content: never;
       };
     };
@@ -459,7 +1011,7 @@ export interface operations {
   };
   /**
    * Зарегистрировать аккаунт
-   * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя.
+   * @description Создаёт аккаунт в статусе pending и отправляет письмо со ссылкой подтверждения. Войти до подтверждения нельзя. Вместе с аккаунтом записываются согласия на обработку персональных данных: номер редакции политики берётся из GET /api/privacy/policy, согласие на обработку обязательно, публичный профиль и рассылки — по желанию.
    */
   post_api_auth_register: {
     requestBody: {
@@ -474,11 +1026,11 @@ export interface operations {
           "application/json": components["schemas"]["UserView"];
         };
       };
-      /** @description Почта уже занята */
+      /** @description Почта уже занята либо политика переиздана и согласие дано под старую редакцию */
       409: {
         content: never;
       };
-      /** @description Данные не прошли валидацию */
+      /** @description Данные не прошли валидацию: в том числе снятая галочка согласия */
       422: {
         content: never;
       };
@@ -589,7 +1141,7 @@ export interface operations {
   };
   /**
    * Публичные профили
-   * @description Почта и хеш пароля наружу не отдаются никогда.
+   * @description Только те, кто согласился показывать профиль в открытой части площадки: публичный список — это распространение персональных данных (ст. 10.1 152-ФЗ). Почта и хеш пароля наружу не отдаются никогда.
    */
   get_api_users_list: {
     responses: {
@@ -687,7 +1239,7 @@ export interface operations {
   };
   /**
    * Поправить лот
-   * @description Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.
+   * @description Переданные поля меняются, пропущенные остаются как были. Публикация, снятие с витрины и архив — это status. Публикация требует действующего допуска к продаже, снятие и архив — нет. Раздел и способ выдачи у заведённого лота не меняются: первый задаёт схему атрибутов и комиссию, второй — есть ли у лота остаток. Уже оформленные заказы правка не задевает, они хранят снимок условий.
    */
   patch_api_seller_offers_update: {
     parameters: {
@@ -712,6 +1264,10 @@ export interface operations {
       401: {
         content: never;
       };
+      /** @description Публикация без действующего допуска к продаже */
+      403: {
+        content: never;
+      };
       /** @description Лота нет или он чужой */
       404: {
         content: never;
@@ -728,7 +1284,7 @@ export interface operations {
   };
   /**
    * Завести лот
-   * @description Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них.
+   * @description Лот рождается черновиком и на витрине не показывается, пока его не опубликовали: PATCH со status=active. Атрибуты обязаны сойтись со схемой раздела — она лежит в карточке игры. Товар с автовыдачей заводится сразу с единицами (ключи, связки логин/пароль), услуга — без них. До первого лота продавец принимает правила продажи и сдаёт экзамен по ним: GET /api/selling/rules, POST /api/selling/admission, POST /api/selling/exam.
    */
   post_api_seller_offers_create: {
     requestBody: {
@@ -745,6 +1301,10 @@ export interface operations {
       };
       /** @description Токен не передан, истёк или недействителен */
       401: {
+        content: never;
+      };
+      /** @description Правила продажи не приняты или экзамен по действующей редакции не сдан */
+      403: {
         content: never;
       };
       /** @description Раздела с таким идентификатором нет или игра отключена */
@@ -839,6 +1399,8 @@ export interface operations {
         role?: "buyer" | "seller";
         /** @description Оставить только заказы в этом статусе */
         status?: "placed" | "paid" | "delivered" | "completed" | "cancelled" | "disputed" | "refunded" | null;
+        /** @description Оставить только заказы по этому лоту. Вместе с role=seller и status=paid это очередь выдачи одного лота */
+        offerId?: string | null;
         /** @description Номер страницы, с единицы */
         page?: number;
         /** @description Размер страницы */
@@ -867,7 +1429,7 @@ export interface operations {
       401: {
         content: never;
       };
-      /** @description Роль, статус или номер страницы вне допустимых значений */
+      /** @description Роль, статус, лот или номер страницы вне допустимых значений */
       422: {
         content: never;
       };
@@ -940,6 +1502,367 @@ export interface operations {
       };
       /** @description Заказа нет или он чужой */
       404: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Выдать заказ
+   * @description Продавец закрывает ручную выдачу: услуга оказана или товар передан. Что именно передано, уезжает в deliveryNote и видно обеим сторонам. Товар с автовыдачей сюда не приходит — он выдан в момент покупки. Деньги остаются в эскроу.
+   */
+  post_api_orders_deliver: {
+    parameters: {
+      path: {
+        /** @description Идентификатор заказа */
+        id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeliverOrderRequest"];
+      };
+    };
+    responses: {
+      /** @description Заказ выдан */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OrderView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description По этому заказу вы покупатель, а не продавец */
+      403: {
+        content: never;
+      };
+      /** @description Заказа нет или он чужой */
+      404: {
+        content: never;
+      };
+      /** @description Заказ не ждёт выдачи: уже выдан, ещё не оплачен или изменился параллельно */
+      409: {
+        content: never;
+      };
+      /** @description Запрос не прошёл валидацию */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Политика обработки персональных данных
+   * @description Действующая редакция целиком. Ручка открыта всем: политику оператор обязан опубликовать в неограниченном доступе (ч. 2 ст. 18.1 152-ФЗ). Номер редакции отсюда клиент присылает обратно при регистрации.
+   */
+  get_api_privacy_policy: {
+    responses: {
+      /** @description Действующая редакция */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PolicyView"];
+        };
+      };
+    };
+  };
+  /**
+   * Мои согласия
+   * @description История: и действующие согласия, и отозванные. Отозванное не исчезает — им оператор подтверждает, что обработка была правомерной.
+   */
+  get_api_privacy_consents: {
+    responses: {
+      /** @description Согласия владельца токена, свежие сверху */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["ConsentView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Дать согласие
+   * @description Для целей, от которых можно отказаться: публичный профиль и рассылки. Повторное согласие на ту же цель ничего не меняет.
+   */
+  post_api_privacy_grant_consent: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GrantConsentRequest"];
+      };
+    };
+    responses: {
+      /** @description Согласие записано */
+      201: {
+        content: {
+          "application/json": components["schemas"]["ConsentView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Неизвестная цель обработки */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Отозвать согласие
+   * @description Отзыв — безусловное право (ч. 2 ст. 9 152-ФЗ) и исполняется сразу. Обязательное согласие на обработку так отозвать нельзя: без него аккаунта не существует, и это уже требование об уничтожении данных.
+   */
+  delete_api_privacy_revoke_consent: {
+    parameters: {
+      path: {
+        purpose: string;
+      };
+    };
+    responses: {
+      /** @description Согласие отозвано либо его и не было */
+      204: {
+        content: never;
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Такой цели обработки не существует */
+      404: {
+        content: never;
+      };
+      /** @description Отзывается обязательное согласие: нужно требование об уничтожении данных */
+      409: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Сведения об обработке моих данных
+   * @description Ответ на запрос по ст. 14 152-ФЗ: оператор, цели и основания, состав данных, сроки хранения, получатели, история согласий. Закон даёт на такой ответ десять рабочих дней — площадка отвечает сразу.
+   */
+  get_api_privacy_me: {
+    responses: {
+      /** @description Выгрузка по владельцу токена */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PersonalDataView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Мои обращения по персональным данным
+   * @description Журнал обращений в части, касающейся заявителя, со сроком ответа по каждому.
+   */
+  get_api_privacy_requests: {
+    responses: {
+      /** @description Обращения владельца токена, свежие сверху */
+      200: {
+        content: {
+          "application/json": {
+            items?: components["schemas"]["SubjectRequestView"][];
+          };
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Подать обращение
+   * @description Запрос сведений, уточнение данных, отзыв согласия. Обращение попадает в журнал с посчитанным сроком ответа.
+   */
+  post_api_privacy_file_request: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FileSubjectRequest"];
+      };
+    };
+    responses: {
+      /** @description Обращение принято */
+      201: {
+        content: {
+          "application/json": components["schemas"]["SubjectRequestView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Неизвестный тип обращения или слишком длинный текст */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Потребовать уничтожения моих данных
+   * @description Исполняется сразу: данные аккаунта обезличиваются, согласия отзываются, выдаётся акт об уничтожении. Войти в аккаунт после этого нельзя. Заказы и записи реестра остаются обезличенными — их хранение обязательно по 402-ФЗ.
+   */
+  post_api_privacy_erasure: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ErasureRequest"];
+      };
+    };
+    responses: {
+      /** @description Данные уничтожены, акт выдан */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DestructionActView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Есть незакрытые сделки или деньги на кошельке */
+      409: {
+        content: never;
+      };
+      /** @description Уничтожение не подтверждено */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Правила продажи и публикации
+   * @description Действующая редакция целиком, в Markdown. Ручка открыта всем: правила читают до того, как решают продавать. Номер редакции отсюда клиент присылает обратно вместе с принятием.
+   */
+  get_api_selling_rules: {
+    responses: {
+      /** @description Действующая редакция */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RulesView"];
+        };
+      };
+    };
+  };
+  /**
+   * Мой допуск к продаже
+   * @description Что спрашивает кнопка «Продавать»: принята ли действующая редакция правил, сдан ли экзамен и можно ли заводить лоты. Новая редакция правил обнуляет допуск — принять и сдать придётся заново.
+   */
+  get_api_selling_admission: {
+    responses: {
+      /** @description Допуск владельца токена к действующей редакции */
+      200: {
+        content: {
+          "application/json": components["schemas"]["AdmissionView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Принять правила
+   * @description Галочка под списком правил. Клиент присылает номер редакции, которую показал человеку, — он сверяется с действующей. Повторное принятие ничего не меняет. Допуск этим ещё не выдан: дальше экзамен.
+   */
+  post_api_selling_accept_rules: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AcceptRulesRequest"];
+      };
+    };
+    responses: {
+      /** @description Правила приняты, можно открывать экзамен */
+      201: {
+        content: {
+          "application/json": components["schemas"]["AdmissionView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Правила переизданы: принята не действующая редакция */
+      409: {
+        content: never;
+      };
+      /** @description Галочка не проставлена или редакция не передана */
+      422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Экзамен по правилам
+   * @description Вопросы для модального окна. Верных вариантов в ответе нет и не будет: ответы проверяет площадка. У каждого вопроса указан пункт правил, из которого он взят.
+   */
+  get_api_selling_exam: {
+    responses: {
+      /** @description Вопросы действующей редакции */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ExamView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Правила ещё не приняты */
+      409: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Сдать экзамен
+   * @description Ответы из модального окна: номер выбранного варианта по идентификатору вопроса. Экзамен сдан только без единой ошибки; в ответе на несданный приходят не разобранные вопросы, а пункты правил, которые стоит перечитать. После неудачной попытки держится минутная пауза — иначе экзамен сдаётся перебором. Сдан — canSell становится true, и форму лота можно открывать.
+   */
+  post_api_selling_take_exam: {
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @example {
+           *   "escrow": 1,
+           *   "commission": 0
+           * }
+           */
+          answers: {
+            [key: string]: number;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description Итог попытки */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ExamResultView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description Правила ещё не приняты */
+      409: {
+        content: never;
+      };
+      /** @description Отвечено не на все вопросы или ответ не номер варианта */
+      422: {
+        content: never;
+      };
+      /** @description Слишком рано после неудачной попытки */
+      429: {
         content: never;
       };
     };

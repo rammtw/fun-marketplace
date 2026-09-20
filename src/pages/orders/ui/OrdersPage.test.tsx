@@ -80,6 +80,30 @@ test('фильтр по статусу уходит в запрос и сбра�
   });
 });
 
+test('очередь выдачи одного лота фильтрует запрос и снимается кнопкой', async () => {
+  mockApi({ 'GET /api/orders': [200, purchases] });
+
+  renderPage('/orders?role=seller&status=paid&offerId=0199b5f0-1d2e-7a3b-8c4d-5e6f70819293');
+  await screen.findByRole('link', { name: /Буст MMR/ });
+
+  const url = requestUrl('GET', '/api/orders');
+  expect(url).toContain('offerId=0199b5f0-1d2e-7a3b-8c4d-5e6f70819293');
+  expect(url).toContain('status=paid');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Показать все' }));
+
+  await waitFor(() => expect(requestUrl('GET', '/api/orders')).not.toContain('offerId'));
+});
+
+test('мусор в offerId на бэкенд не уходит', async () => {
+  mockApi({ 'GET /api/orders': [200, purchases] });
+
+  renderPage('/orders?offerId=не-uuid');
+  await screen.findByRole('link', { name: /Буст MMR/ });
+
+  expect(requestUrl('GET', '/api/orders')).not.toContain('offerId');
+});
+
 test('пустой список зовёт на витрину', async () => {
   mockApi({ 'GET /api/orders': [200, { items: [], page: 1, perPage: 20, total: 0 }] });
 

@@ -14,17 +14,15 @@ interface WalletState {
   balance: WalletView | null;
   loading: boolean;
   error: Error | null;
-  /** Перечитать баланс с сервера — после покупки. */
+  /** Перечитать баланс с сервера — после покупки, пополнения и вывода. */
   refresh: () => void;
-  /** Положить баланс из ответа ручки, которая его вернула, — после пополнения. */
-  apply: (wallet: WalletView) => void;
 }
 
 const WalletContext = createContext<WalletState | null>(null);
 
 /**
  * Баланс показывают шапка, панель покупки и страница кошелька, и после каждой
- * покупки или пополнения он меняется. Поэтому он живёт в одном месте, а не
+ * покупки, пополнения и выплаты он меняется. Поэтому он живёт в одном месте, а не
  * загружается каждым экраном отдельно — иначе в шапке остаются старые деньги.
  */
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -63,14 +61,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [status, attempt]);
 
   const refresh = useCallback(() => setAttempt((previous) => previous + 1), []);
-  const apply = useCallback((wallet: WalletView) => {
-    setBalance(wallet);
-    setError(null);
-  }, []);
 
   const value = useMemo<WalletState>(
-    () => ({ balance, loading, error, refresh, apply }),
-    [balance, loading, error, refresh, apply],
+    () => ({ balance, loading, error, refresh }),
+    [balance, loading, error, refresh],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

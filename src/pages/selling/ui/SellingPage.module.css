@@ -1,0 +1,81 @@
+.page {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 19px;
+}
+
+.version {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.rules {
+  max-height: 420px;
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.accept {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

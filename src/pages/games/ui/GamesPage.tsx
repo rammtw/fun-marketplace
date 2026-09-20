@@ -1,15 +1,17 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { fetchGames } from 'shared/api';
 import { Alert } from 'shared/ui/Alert';
 import { Spinner } from 'shared/ui/Spinner';
-import { TextField } from 'shared/ui/TextField';
 import { useAsyncData } from 'shared/lib';
 import { GameCard } from './GameCard';
 import styles from './GamesPage.module.css';
 
 export function GamesPage() {
   const { data: games, error, loading } = useAsyncData(fetchGames, []);
-  const [query, setQuery] = useState('');
+  // Запрос набирают в шапке, а живёт он в адресе: витрина его только читает.
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get('q') ?? '';
   // Список игр небольшой, но фильтрация не должна тормозить набор текста.
   const deferredQuery = useDeferredValue(query);
 
@@ -22,33 +24,13 @@ export function GamesPage() {
       return games;
     }
 
-    return games.filter(
-      (game) =>
-        game.title.toLowerCase().includes(needle) ||
-        game.platforms.some((platform) => platform.toLowerCase().includes(needle)),
-    );
+    // Ищем только по названию: платформы на витрине не показываются, а искать
+    // по тому, чего на карточке нет, — это выдача без видимой причины.
+    return games.filter((game) => game.title.toLowerCase().includes(needle));
   }, [games, deferredQuery]);
 
   return (
     <>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Игры площадки</h1>
-          <p className={styles.subtitle}>
-            Выберите игру, чтобы посмотреть товары и услуги её продавцов.
-          </p>
-        </div>
-        <div className={styles.search}>
-          <TextField
-            label="Поиск"
-            type="search"
-            placeholder="Название или платформа"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-      </header>
-
       {loading ? <Spinner label="Загружаем игры…" /> : null}
       {error ? <Alert tone="error">{error.message}</Alert> : null}
 

@@ -1,0 +1,39 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--color-accent);
+}
+
+.label {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.hint,
+.error {
+  padding-left: 28px;
+  font-size: 13px;
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+}

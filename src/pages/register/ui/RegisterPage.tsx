@@ -1,18 +1,30 @@
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
-import { ApiError, register } from 'shared/api';
-import type { UserView } from 'shared/api';
+import { ApiError, fetchPolicy, register } from 'shared/api';
+import type { PolicyView, UserView } from 'shared/api';
+import { formatDateTime, useAsyncData } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
 import { Button } from 'shared/ui/Button';
+import { Checkbox } from 'shared/ui/Checkbox';
+import { Spinner } from 'shared/ui/Spinner';
 import { TextField } from 'shared/ui/TextField';
 import styles from './AuthForm.module.css';
 
 const PASSWORD_MIN_LENGTH = 8;
 
 export function RegisterPage() {
+  const loadedPolicy = useAsyncData(fetchPolicy, []);
+  // Переизданную политику перечитываем сами, в обход загрузчика: её текст
+  // нужно показать вместе с ошибкой, а не вместо формы со спиннером.
+  const [reissuedPolicy, setReissuedPolicy] = useState<PolicyView | null>(null);
+  const policy = reissuedPolicy ?? loadedPolicy.data;
+
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [personalDataConsent, setPersonalDataConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [missingConsent, setMissingConsent] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [created, setCreated] = useState<UserView | null>(null);
   const [pending, setPending] = useState(false);
@@ -25,16 +37,60 @@ export function RegisterPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!policy) {
+      return;
+    }
+
+    // Обязательное согласие сторожим на месте: снятая галочка — это не ошибка
+    // ввода, за которой стоит идти на бэкенд, а незаданный вопрос.
+    if (!personalDataConsent) {
+      setMissingConsent(true);
+      setError(null);
+      return;
+    }
+
     setPending(true);
+    setMissingConsent(false);
     setError(null);
 
     try {
-      setCreated(await register({ email, password, displayName }));
+      setCreated(
+        await register({
+          email,
+          password,
+          displayName,
+          policyVersion: policy.version,
+          personalDataConsent,
+          marketingConsent,
+        }),
+      );
     } catch (cause) {
-      setError(cause instanceof Error ? cause : new Error(String(cause)));
+      setError(await explain(cause, policy.version));
     } finally {
       setPending(false);
     }
+  }
+
+  /**
+   * 409 — это и занятая почта, и переизданная политика. Ответ пустой, так что
+   * различаем по редакции: если действующая уже другая, согласие было дано под
+   * снятый с публикации текст и его нужно взять заново под новый.
+   */
+  async function explain(cause: unknown, sentVersion: string): Promise<Error> {
+    if (cause instanceof ApiError && cause.status === 409) {
+      const fresh = await fetchPolicy().catch(() => null);
+      if (fresh && fresh.version !== sentVersion) {
+        setReissuedPolicy(fresh);
+        setPersonalDataConsent(false);
+        return new Error(
+          `Политика изменилась, пока вы заполняли форму: теперь действует редакция ${fresh.version}. Прочитайте её и согласитесь заново.`,
+        );
+      }
+
+      return new Error('Эта почта уже занята. Войдите или укажите другую.');
+    }
+
+    return cause instanceof Error ? cause : new Error(String(cause));
   }
 
   if (created) {
@@ -77,6 +133,7 @@ export function RegisterPage() {
           maxLength={64}
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
+          hint="Псевдоним для витрины: настоящее имя не нужно"
           error={violation('displayName')}
         />
         <TextField
@@ -93,9 +150,55 @@ export function RegisterPage() {
           error={violation('password')}
         />
 
+        {loadedPolicy.loading ? <Spinner label="Загружаем политику…" /> : null}
+
+        {loadedPolicy.error && !policy ? (
+          <Alert tone="error">
+            Не удалось загрузить политику обработки персональных данных, а без неё регистрация
+            невозможна:{' '}
+            <button type="button" className={styles.linkButton} onClick={loadedPolicy.reload}>
+              попробовать снова
+            </button>
+          </Alert>
+        ) : null}
+
+        {policy ? (
+          <fieldset className={styles.consents}>
+            <legend className={styles.consentsTitle}>Персональные данные</legend>
+
+            {/* Текст живёт отдельной страницей: в новой вкладке, чтобы
+                заполненная форма не потерялась по дороге. */}
+            <p className={styles.policyLink}>
+              <Link to="/privacy" target="_blank" rel="noreferrer">
+                {policy.title} — редакция {policy.version} от {formatDateTime(policy.publishedAt)}
+              </Link>
+            </p>
+
+            <Checkbox
+              label={`Даю согласие на обработку моих персональных данных на условиях политики (редакция ${policy.version})`}
+              name="personalDataConsent"
+              checked={personalDataConsent}
+              onChange={(event) => setPersonalDataConsent(event.target.checked)}
+              error={
+                violation('personalDataConsent') ??
+                violation('policyVersion') ??
+                (missingConsent ? 'Без согласия аккаунт не завести' : undefined)
+              }
+            />
+            <Checkbox
+              label="Получать письма о новинках и акциях"
+              name="marketingConsent"
+              checked={marketingConsent}
+              onChange={(event) => setMarketingConsent(event.target.checked)}
+              hint="По желанию: письма о заказах приходят и без этого"
+              error={violation('marketingConsent')}
+            />
+          </fieldset>
+        ) : null}
+
         {commonError && error ? <Alert tone="error">{error.message}</Alert> : null}
 
-        <Button type="submit" block disabled={pending}>
+        <Button type="submit" block disabled={pending || !policy}>
           {pending ? 'Создаём аккаунт…' : 'Зарегистрироваться'}
         </Button>
       </form>

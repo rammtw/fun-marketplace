@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { installFetchMock, mockFetchOnce } from 'shared/api/test-fetch';
 import { GamesPage } from './GamesPage';
@@ -15,9 +14,9 @@ beforeEach(() => {
   installFetchMock();
 });
 
-function renderPage() {
+function renderPage(path = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <GamesPage />
     </MemoryRouter>,
   );
@@ -34,15 +33,19 @@ test('показывает игры витрины со ссылкой на ло
   expect(screen.getByRole('link', { name: /Genshin Impact/ })).toBeInTheDocument();
 });
 
-test('фильтрует список по названию и платформе', async () => {
+test('фильтрует список по запросу из адреса — по названию', async () => {
   mockFetchOnce(200, games);
-  renderPage();
-  await screen.findByRole('link', { name: /Dota 2/ });
-
-  await userEvent.type(screen.getByLabelText('Поиск'), 'ios');
+  renderPage('/?q=gen');
 
   expect(await screen.findByRole('link', { name: /Genshin Impact/ })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /Dota 2/ })).not.toBeInTheDocument();
+});
+
+test('платформа запросом больше не считается', async () => {
+  mockFetchOnce(200, games);
+  renderPage('/?q=ios');
+
+  expect(await screen.findByText('Ничего не нашлось по такому запросу.')).toBeInTheDocument();
 });
 
 test('показывает ошибку, когда витрина не ответила', async () => {

@@ -1,6 +1,11 @@
-.card {
-  max-width: 520px;
+.page {
+  display: grid;
+  gap: 16px;
+  max-width: 620px;
   margin: 0 auto;
+}
+
+.card {
   padding: 24px;
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -10,6 +15,11 @@
 .title {
   margin: 0 0 18px;
   font-size: 24px;
+}
+
+.cardTitle {
+  margin: 0 0 16px;
+  font-size: 18px;
 }
 
 .balance {
@@ -40,7 +50,7 @@
 }
 
 .hint {
-  margin: 0 0 20px;
+  margin: 0;
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.5;
@@ -50,8 +60,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-top: 18px;
-  border-top: 1px solid var(--color-border);
 }
 
 .quick {
@@ -74,4 +82,70 @@
 .quickButton:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.rowTitle {
+  display: block;
+  font-weight: 600;
+}
+
+.rowMeta {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.rowRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.rowAmount {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  grid-column: 1 / -1;
+}
+
+.rowLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rowLink:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
