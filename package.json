@@ -25,7 +25,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "typecheck": "tsc --noEmit",
-    "api:schema": "cp ../symfony-universe/docs/openapi.json src/shared/api/openapi.json",
+    "api:schema": "node --env-file-if-exists=.env.local -e \"require('fs').copyFileSync((process.env.BACKEND_DIR || '../fun-marketplace-backend') + '/docs/openapi.json', 'src/shared/api/openapi.json')\"",
     "api:types": "openapi-typescript src/shared/api/openapi.json -o src/shared/api/schema.d.ts",
     "api:sync": "npm run api:schema && npm run api:types"
   },
