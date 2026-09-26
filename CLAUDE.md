@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Фронтенд площадки игровых товаров и услуг: витрина игр, каталог лотов по игре,
 карточка лота с покупкой, заказы, кошелёк, рабочий стол продавца со своими лотами,
-регистрация и вход. Бэкенд лежит рядом — `../symfony-universe` (JSON API + JWT,
+регистрация и вход. Бэкенд лежит рядом — `../fun-marketplace-backend` (JSON API + JWT,
 без своего фронта); его `CLAUDE.md`, `AGENTS.md` и `docs/architecture.md` описывают
 домен и решения, перед доменной работой читать их, а не догадываться по именам полей.
 
@@ -30,16 +30,21 @@ CI=true npx react-scripts test src/app/App.test.tsx -t "гостю показы�
 npm run api:sync             # = api:schema + api:types
 ```
 
-`api:schema` копирует `../symfony-universe/docs/openapi.json` в
-`src/shared/api/openapi.json`, `api:types` прогоняет его через `openapi-typescript`
-в `src/shared/api/schema.d.ts`. `schema.d.ts` — артефакт, руками не править; удобные
-имена для типов из него живут в `src/shared/api/contract.ts`. Контракт поменялся —
+`api:schema` копирует `docs/openapi.json` бэкенда в `src/shared/api/openapi.json`.
+Путь к бэкенду задаёт переменная `BACKEND_DIR` (по умолчанию `../fun-marketplace-backend`).
+Постоянно — строкой `BACKEND_DIR=/path/to/backend` в `.env.local`: файл в `.gitignore`,
+скрипт читает его через `node --env-file-if-exists` (нужен Node ≥ 22.9), а CRA переменные
+без префикса `REACT_APP_` в бандл не пускает. Разово — `BACKEND_DIR=... npm run api:sync`,
+окружение важнее файла.
+`api:types` прогоняет спеку через `openapi-typescript` в `src/shared/api/schema.d.ts`.
+`schema.d.ts` — артефакт, руками не править; удобные имена для типов из него живут
+в `src/shared/api/contract.ts`. Контракт поменялся —
 сначала в бэкенде `make openapi`, потом здесь `npm run api:sync`. Сама спека лежит
 в репозитории, так что читать контракт можно и без поднятого бэкенда.
 
 ## Бэкенд под рукой
 
-В `../symfony-universe`: `make up` поднимает стек, `make fixtures` заливает игры,
+В `../fun-marketplace-backend`: `make up` поднимает стек, `make fixtures` заливает игры,
 лоты и аккаунты. API — `http://localhost:8080`, Swagger UI — `/api/doc`, письма —
 Mailpit на `http://localhost:8025`.
 

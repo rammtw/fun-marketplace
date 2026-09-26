@@ -188,6 +188,13 @@ export interface paths {
      */
     post: operations["post_api_orders_deliver"];
   };
+  "/api/orders/{id}/confirm": {
+    /**
+     * Подтвердить получение
+     * @description Покупатель подтверждает, что получил товар или услугу. Заказ закрывается, эскроу разблокируется: продавцу зачисляется payout, комиссия остаётся площадке. Действие необратимо — после него спор по заказу не открыть.
+     */
+    post: operations["post_api_orders_confirm"];
+  };
   "/api/privacy/policy": {
     /**
      * Политика обработки персональных данных
@@ -452,10 +459,13 @@ export interface components {
     };
     /** @enum {string} */
     SectionKind: "goods" | "service";
+    /** @enum {string} */
+    SectionCategory: "accounts" | "currency" | "items" | "boost";
     SectionView: {
       id: number;
       title: string;
       kind: components["schemas"]["SectionKind"];
+      category: components["schemas"]["SectionCategory"];
       commissionBasisPoints: number;
       attributeSchema: {
         [key: string]: unknown;
@@ -491,6 +501,7 @@ export interface components {
       id: number;
       title: string;
       kind: components["schemas"]["SectionKind"];
+      category: components["schemas"]["SectionCategory"];
       commissionBasisPoints: number;
       gameSlug: string;
       gameTitle: string;
@@ -571,6 +582,11 @@ export interface components {
       deliveredItems: string[];
       /** @default null */
       deliveryNote?: string | null;
+      /**
+       * Format: date-time
+       * @default null
+       */
+      completedAt?: string | null;
     };
     PolicyView: {
       version: string;
@@ -1547,6 +1563,42 @@ export interface operations {
       };
       /** @description Запрос не прошёл валидацию */
       422: {
+        content: never;
+      };
+    };
+  };
+  /**
+   * Подтвердить получение
+   * @description Покупатель подтверждает, что получил товар или услугу. Заказ закрывается, эскроу разблокируется: продавцу зачисляется payout, комиссия остаётся площадке. Действие необратимо — после него спор по заказу не открыть.
+   */
+  post_api_orders_confirm: {
+    parameters: {
+      path: {
+        /** @description Идентификатор заказа */
+        id: string;
+      };
+    };
+    responses: {
+      /** @description Заказ подтверждён, деньги у продавца */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OrderView"];
+        };
+      };
+      /** @description Токен не передан, истёк или недействителен */
+      401: {
+        content: never;
+      };
+      /** @description По этому заказу вы продавец, а не покупатель */
+      403: {
+        content: never;
+      };
+      /** @description Заказа нет или он чужой */
+      404: {
+        content: never;
+      };
+      /** @description Заказ не ждёт подтверждения: ещё не выдан, уже подтверждён или изменился параллельно */
+      409: {
         content: never;
       };
     };

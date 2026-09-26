@@ -1350,6 +1350,58 @@
                 ]
             }
         },
+        "/api/orders/{id}/confirm": {
+            "post": {
+                "tags": [
+                    "Заказы"
+                ],
+                "summary": "Подтвердить получение",
+                "description": "Покупатель подтверждает, что получил товар или услугу. Заказ закрывается, эскроу разблокируется: продавцу зачисляется payout, комиссия остаётся площадке. Действие необратимо — после него спор по заказу не открыть.",
+                "operationId": "post_api_orders_confirm",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Идентификатор заказа",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Заказ подтверждён, деньги у продавца",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderView"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Токен не передан, истёк или недействителен"
+                    },
+                    "403": {
+                        "description": "По этому заказу вы продавец, а не покупатель"
+                    },
+                    "404": {
+                        "description": "Заказа нет или он чужой"
+                    },
+                    "409": {
+                        "description": "Заказ не ждёт подтверждения: ещё не выдан, уже подтверждён или изменился параллельно"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/privacy/policy": {
             "get": {
                 "tags": [
@@ -2340,11 +2392,21 @@
                     "service"
                 ]
             },
+            "SectionCategory": {
+                "type": "string",
+                "enum": [
+                    "accounts",
+                    "currency",
+                    "items",
+                    "boost"
+                ]
+            },
             "SectionView": {
                 "required": [
                     "id",
                     "title",
                     "kind",
+                    "category",
                     "commissionBasisPoints",
                     "attributeSchema"
                 ],
@@ -2357,6 +2419,9 @@
                     },
                     "kind": {
                         "$ref": "#/components/schemas/SectionKind"
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/SectionCategory"
                     },
                     "commissionBasisPoints": {
                         "type": "integer"
@@ -2481,6 +2546,7 @@
                     "id",
                     "title",
                     "kind",
+                    "category",
                     "commissionBasisPoints",
                     "gameSlug",
                     "gameTitle"
@@ -2494,6 +2560,9 @@
                     },
                     "kind": {
                         "$ref": "#/components/schemas/SectionKind"
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/SectionCategory"
                     },
                     "commissionBasisPoints": {
                         "type": "integer"
@@ -2768,6 +2837,12 @@
                     },
                     "deliveryNote": {
                         "type": "string",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "completedAt": {
+                        "type": "string",
+                        "format": "date-time",
                         "nullable": true,
                         "default": null
                     }
