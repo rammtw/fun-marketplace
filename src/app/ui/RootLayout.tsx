@@ -19,6 +19,14 @@ export function RootLayout() {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  // Продажи и покупки — один маршрут /orders, различает их только ?role=seller.
+  // NavLink сверяет путь без query и зажигал бы «Покупки» на продажах, поэтому
+  // активный пункт считаем сами.
+  const inSales = pathname === '/orders' && searchParams.get('role') === 'seller';
+  const salesActive = inWorkspace || inSales;
+  const purchasesActive =
+    (pathname === '/orders' || pathname.startsWith('/orders/')) && !inSales;
+
   // Поиск живёт в адресе витрины, поэтому ссылкой на найденное можно поделиться.
   // На других страницах поле пустое: искать там нечего, набор текста уводит на витрину.
   const isStorefront = pathname === '/';
@@ -71,23 +79,21 @@ export function RootLayout() {
             {status === 'authenticated' && user ? (
               <>
                 {hasOffers ? (
-                  <NavLink
+                  <Link
                     to="/my/offers"
-                    className={({ isActive }) =>
-                      `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
-                    }
+                    className={`${styles.navLink} ${salesActive ? styles.navLinkActive : ''}`}
+                    aria-current={salesActive ? 'page' : undefined}
                   >
                     Продажи
-                  </NavLink>
+                  </Link>
                 ) : null}
-                <NavLink
+                <Link
                   to="/orders"
-                  className={({ isActive }) =>
-                    `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
-                  }
+                  className={`${styles.navLink} ${purchasesActive ? styles.navLinkActive : ''}`}
+                  aria-current={purchasesActive ? 'page' : undefined}
                 >
                   Покупки
-                </NavLink>
+                </Link>
                 {/* Баланс — он же вход в кошелёк: две ссылки рядом были бы об одном. */}
                 <NavLink
                   to="/wallet"
