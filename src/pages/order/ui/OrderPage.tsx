@@ -9,6 +9,7 @@ import { formatDateTime, formatMoney, useAsyncData } from 'shared/lib';
 import { Alert } from 'shared/ui/Alert';
 import { Badge } from 'shared/ui/Badge';
 import { Spinner } from 'shared/ui/Spinner';
+import { ConfirmPanel } from './ConfirmPanel';
 import { DeliverPanel } from './DeliverPanel';
 import styles from './OrderPage.module.css';
 
@@ -16,15 +17,24 @@ export function OrderPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { user } = useSession();
   const { data, error, loading, reload } = useAsyncData((signal) => fetchOrder(id, signal), [id]);
-  // Ручка выдачи возвращает заказ целиком, так что после неё показываем ответ,
-  // а не перечитываем. Сверка по id гасит накладку при переходе на другой заказ.
-  const [delivered, setDelivered] = useState<OrderView | null>(null);
-  const order = delivered?.id === id ? delivered : data;
+  // Ручки выдачи и подтверждения возвращают заказ целиком, так что после них
+  // показываем ответ, а не перечитываем. Сверка по id гасит накладку при переходе
+  // на другой заказ.
+  const [updated, setUpdated] = useState<OrderView | null>(null);
+  const order = updated?.id === id ? updated : data;
 
-  const handleStale = useCallback(() => {
-    setDelivered(null);
-    reload();
-  }, [reload]);
+  // Панель, получившая 409, после перечитывания пропадает вместе со своей ошибкой
+  // (статус уже другой), поэтому объяснение держит страница.
+  const [stale, setStale] = useState<{ id: string; message: string } | null>(null);
+
+  const handleStale = useCallback(
+    (message: string) => {
+      setUpdated(null);
+      setStale({ id, message });
+      reload();
+    },
+    [id, reload],
+  );
 
   if (error instanceof ApiError && error.status === 404) {
     return (
@@ -49,6 +59,8 @@ export function OrderPage() {
   // Товар с автовыдачей уходит покупателю сразу, услуга ждёт продавца: в статусе
   // paid выдача ещё за ним, и только он её может закрыть.
   const awaitingSeller = order.status === 'paid' && order.deliveredItems.length === 0;
+  // Выданный заказ закрывает покупатель: до подтверждения деньги в эскроу.
+  const awaitingBuyer = order.status === 'delivered';
 
   return (
     <div className={styles.card}>
@@ -56,6 +68,8 @@ export function OrderPage() {
         <h1 className={styles.title}>{order.offer.title}</h1>
         <Badge tone={status.tone}>{status.label}</Badge>
       </div>
+
+      {stale?.id === id ? <Alert tone="error">{stale.message}</Alert> : null}
 
       <dl className={styles.rows}>
         <dt className={styles.key}>Количество</dt>
@@ -89,6 +103,13 @@ export function OrderPage() {
             <dd className={styles.value}>{formatDateTime(order.deliveredAt)}</dd>
           </>
         ) : null}
+
+        {order.completedAt ? (
+          <>
+            <dt className={styles.key}>Завершён</dt>
+            <dd className={styles.value}>{formatDateTime(order.completedAt)}</dd>
+          </>
+        ) : null}
       </dl>
 
       {order.deliveredItems.length > 0 ? (
@@ -116,11 +137,24 @@ export function OrderPage() {
       {awaitingSeller ? (
         <div className={styles.delivered}>
           {isSeller ? (
-            <DeliverPanel order={order} onDelivered={setDelivered} onStale={handleStale} />
+            <DeliverPanel order={order} onDelivered={setUpdated} onStale={handleStale} />
           ) : (
             <Alert tone="info">
-              Деньги удерживаются в эскроу и уйдут продавцу после того, как он выполнит заказ.
+              Деньги удерживаются в эскроу. Продавец получит их, только когда выполнит заказ и
+              вы подтвердите получение.
             </Alert>
+          )}
+        </div>
+      ) : null}
+
+      {awaitingBuyer ? (
+        <div className={styles.delivered}>
+          {isSeller ? (
+            <Alert tone="info">
+              Деньги удерживаются в эскроу, пока покупатель не подтвердит получение.
+            </Alert>
+          ) : (
+            <ConfirmPanel order={order} onConfirmed={setUpdated} onStale={handleStale} />
           )}
         </div>
       ) : null}

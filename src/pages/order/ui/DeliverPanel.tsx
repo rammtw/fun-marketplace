@@ -11,8 +11,8 @@ interface DeliverPanelProps {
   order: OrderView;
   /** Ответ ручки — тот же заказ после выдачи: страница обновляется по нему. */
   onDelivered: (order: OrderView) => void;
-  /** Заказ разъехался с тем, что на экране: перечитываем его целиком. */
-  onStale: () => void;
+  /** Заказ разъехался с тем, что на экране: страница перечитает его и покажет `message`. */
+  onStale: (message: string) => void;
 }
 
 /** Общий текст под формой; нарушение поля показывает сама форма. */
@@ -47,11 +47,12 @@ export function DeliverPanel({ order, onDelivered, onStale }: DeliverPanelProps)
       try {
         onDelivered(await deliverOrder(order.id, note));
       } catch (cause) {
-        setError(cause instanceof Error ? cause : new Error(String(cause)));
         // 409 — заказ уже выдан или отменён кем-то ещё: показывать старое состояние нельзя.
         if (cause instanceof ApiError && cause.status === 409) {
-          onStale();
+          onStale(deliverMessage(cause));
+          return;
         }
+        setError(cause instanceof Error ? cause : new Error(String(cause)));
       } finally {
         setPending(false);
       }
