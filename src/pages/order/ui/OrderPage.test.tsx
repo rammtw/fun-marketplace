@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { installFetchMock, mockApi, requestBody } from 'shared/api/test-fetch';
+import { WalletProvider } from 'entities/wallet';
+import { installFetchMock, mockApi, requestBody, requestCount } from 'shared/api/test-fetch';
 import { SessionProvider } from 'shared/auth';
 import { OrderPage } from './OrderPage';
 
@@ -38,6 +39,14 @@ const delivered = {
   deliveryNote: NOTE,
 };
 
+const completed = {
+  ...delivered,
+  status: 'completed',
+  completedAt: '2026-09-19T10:00:00+00:00',
+};
+
+const wallet = { userId: 'u-buyer', available: money(100000), held: money(450000) };
+
 beforeEach(() => {
   installFetchMock();
   localStorage.setItem('universe.token', 'jwt-token');
@@ -46,11 +55,13 @@ beforeEach(() => {
 function renderPage() {
   return render(
     <SessionProvider>
-      <MemoryRouter initialEntries={['/orders/o-1']}>
-        <Routes>
-          <Route path="/orders/:id" element={<OrderPage />} />
-        </Routes>
-      </MemoryRouter>
+      <WalletProvider>
+        <MemoryRouter initialEntries={['/orders/o-1']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderPage />} />
+          </Routes>
+        </MemoryRouter>
+      </WalletProvider>
     </SessionProvider>,
   );
 }
@@ -102,17 +113,21 @@ test('конфликт статуса перечитывает заказ и о�
   renderPage();
 
   await userEvent.type(await screen.findByLabelText('Что вы передали покупателю'), NOTE);
+  // Пока продавец печатал, заказ выдали: перечитывание вернёт уже выданный.
+  mockApi({
+    'GET /api/auth/me': [200, user('u-seller', 'SkinLord')],
+    'GET /api/orders/o-1': [200, delivered],
+    'POST /api/orders/o-1/deliver': [
+      409,
+      { detail: 'Заказ в статусе «delivered», ожидался «paid».' },
+    ],
+  });
   await userEvent.click(screen.getByRole('button', { name: 'Отметить выданным' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(/ожидался «paid»/);
-  await waitFor(() =>
-    expect(
-      (global.fetch as jest.Mock).mock.calls.filter(
-        ([input, init]) =>
-          String(input).endsWith('/api/orders/o-1') && (init?.method ?? 'GET') === 'GET',
-      ),
-    ).toHaveLength(2),
-  );
+  expect(await screen.findByText('Что вы передали')).toBeInTheDocument();
+  // Панель выдачи после перечитывания пропала, а объяснение осталось.
+  expect(screen.getByRole('alert')).toHaveTextContent(/ожидался «paid»/);
+  expect(screen.queryByRole('button', { name: 'Отметить выданным' })).not.toBeInTheDocument();
 });
 
 test('покупателю выдачи не предлагают: он ждёт продавца, а потом читает выдачу', async () => {
@@ -135,4 +150,83 @@ test('покупателю выдачи не предлагают: он ждёт
 
   expect(await screen.findByText('Что передал продавец')).toBeInTheDocument();
   expect(screen.getByText(NOTE)).toBeInTheDocument();
+});
+
+test('покупатель подтверждает получение, и заказ закрывается', async () => {
+  mockApi({
+    'GET /api/auth/me': [200, user('u-buyer', 'Gamer')],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/orders/o-1': [200, delivered],
+    'POST /api/orders/o-1/confirm': [200, completed],
+  });
+
+  renderPage();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Подтвердить получение' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(/спор по заказу открыть уже нельзя/);
+  await userEvent.click(screen.getByRole('button', { name: 'Да, всё получено' }));
+
+  expect(await screen.findByText('Завершён', { selector: 'span' })).toBeInTheDocument();
+  expect(requestCount('POST', '/api/orders/o-1/confirm')).toBe(1);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Подтвердить получение' }),
+  ).not.toBeInTheDocument();
+  // Удержание по заказу списано — баланс в шапке перечитывается.
+  await waitFor(() => expect(requestCount('GET', '/api/wallet')).toBe(2));
+});
+
+test('отказ в окне подтверждения ничего не отправляет', async () => {
+  mockApi({
+    'GET /api/auth/me': [200, user('u-buyer', 'Gamer')],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/orders/o-1': [200, delivered],
+  });
+
+  renderPage();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Подтвердить получение' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(requestCount('POST', '/api/orders/o-1/confirm')).toBe(0);
+});
+
+test('если заказ уже не ждёт подтверждения, его перечитывают', async () => {
+  mockApi({
+    'GET /api/auth/me': [200, user('u-buyer', 'Gamer')],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/orders/o-1': [200, delivered],
+  });
+
+  renderPage();
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Подтвердить получение' }));
+  // Заказ успели закрыть с другой вкладки: перечитывание вернёт завершённый.
+  mockApi({
+    'GET /api/auth/me': [200, user('u-buyer', 'Gamer')],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/orders/o-1': [200, completed],
+    'POST /api/orders/o-1/confirm': [409, { detail: 'Заказ в статусе «completed».' }],
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'Да, всё получено' }));
+
+  expect(await screen.findByText('Завершён', { selector: 'span' })).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent(/уже не ждёт подтверждения/);
+  expect(requestCount('GET', '/api/orders/o-1')).toBe(2);
+});
+
+test('продавцу подтверждать нечего: он ждёт покупателя', async () => {
+  mockApi({
+    'GET /api/auth/me': [200, user('u-seller', 'SkinLord')],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/orders/o-1': [200, delivered],
+  });
+
+  renderPage();
+
+  expect(await screen.findByText(/пока покупатель не подтвердит/)).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Подтвердить получение' }),
+  ).not.toBeInTheDocument();
 });

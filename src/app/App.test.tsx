@@ -128,6 +128,45 @@ test('продавцу с лотами показывают «Продажи»',
   );
 });
 
+test('на «Моих продажах» в шапке горят «Продажи», а не «Покупки»', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  window.history.pushState({}, '', '/orders?role=seller');
+  mockApi({
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/offers/mine': [200, { items: [{ id: 'of-1', status: 'active' }] }],
+    'GET /api/orders': [200, { items: [], page: 1, perPage: 20, total: 0 }],
+  });
+
+  render(<App />);
+
+  await screen.findByRole('heading', { name: 'Мои продажи' });
+  expect(await screen.findByRole('link', { name: 'Продажи' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  expect(screen.getByRole('link', { name: 'Покупки' })).not.toHaveAttribute('aria-current');
+});
+
+test('на «Моих покупках» горят «Покупки»', async () => {
+  localStorage.setItem('universe.token', 'jwt-token');
+  window.history.pushState({}, '', '/orders');
+  mockApi({
+    'GET /api/auth/me': [200, me],
+    'GET /api/wallet': [200, wallet],
+    'GET /api/offers/mine': [200, { items: [{ id: 'of-1', status: 'active' }] }],
+    'GET /api/orders': [200, { items: [], page: 1, perPage: 20, total: 0 }],
+  });
+
+  render(<App />);
+
+  await screen.findByRole('heading', { name: 'Мои покупки' });
+  expect(screen.getByRole('link', { name: 'Покупки' })).toHaveAttribute('aria-current', 'page');
+  expect(await screen.findByRole('link', { name: 'Продажи' })).not.toHaveAttribute(
+    'aria-current',
+  );
+});
+
 test('поиск в шапке фильтрует витрину и остаётся в адресе', async () => {
   mockApi({ 'GET /api/games': [200, { items: [...games.items, genshin] }] });
 
